@@ -45,8 +45,11 @@ def link_or_copy(src: Path, dst: Path) -> str:
         os.link(src, dst)
         return "hardlink"
     except OSError:
-        shutil.copy2(src, dst)
-        return "copy"
+        try:
+            shutil.copy2(src, dst)
+            return "copy"
+        except shutil.SameFileError:
+            return "exists"
 
 
 def prepare(src: Path, dst: Path) -> dict[str, object]:
@@ -71,7 +74,6 @@ def prepare(src: Path, dst: Path) -> dict[str, object]:
     actions = {}
     for shard in SHARDS:
         actions[shard] = link_or_copy(src / shard, dst / shard)
-
     slim = {
         "metadata": {
             "total_size": raw.get("metadata", {}).get("total_size"),
@@ -82,8 +84,14 @@ def prepare(src: Path, dst: Path) -> dict[str, object]:
     (dst / "model.safetensors.index.json").write_text(json.dumps(slim, indent=2) + "\n")
     cfg = src / "config.json"
     if cfg.is_file():
-        shutil.copy2(cfg, dst / "config.json")
-        actions["config.json"] = "copy"
+        # engram_file_backend reads engram_layer_ids/engram_num_embeddings from
+        # config.json in the table dir — the slim dir must carry it too. Tolerate
+        # dst already being a hardlink to src (idempotent re-runs).
+        try:
+            shutil.copy2(cfg, dst / "config.json")
+            actions["config.json"] = "copy"
+        except shutil.SameFileError:
+            actions["config.json"] = "exists"
     return {"dst": str(dst), "tensors": sorted(keep), "files": actions}
 
 
