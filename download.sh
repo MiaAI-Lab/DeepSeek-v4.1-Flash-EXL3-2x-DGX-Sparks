@@ -18,6 +18,10 @@ set +a
 
 MODEL_HOST="${MODEL_HOST:-$SCRIPT_DIR/model}"
 ENGRAM_DIR="${ENGRAM_DIR:-$SCRIPT_DIR/engram-src}"
+# Create both targets before the find() probes below: on a first run neither
+# exists, and `find` on a missing path exits 1 — with `set -euo pipefail` the
+# command substitution kills the script before it prints anything at all.
+mkdir -p "$MODEL_HOST" "$ENGRAM_DIR"
 HF_MODEL_REPO="${HF_MODEL_REPO:-Mia-AiLab/DeepSeek-V4.1-Flash-EXL3-2.9bpw}"
 HF_ENGRAM_REPO="${HF_ENGRAM_REPO:-deepseek-ai/DeepSeek-V4.1-Flash}"
 EXPECTED_SHARDS="${EXPECTED_SHARDS:-39}"
@@ -44,6 +48,10 @@ ENGRAM_FILES=(
     "model-00047-of-00048.safetensors"
     "model-00048-of-00048.safetensors"
     "model.safetensors.index.json"
+    # engram_file_backend._layer_id_from_embeddings() reads
+    # engram_layer_ids/engram_num_embeddings from config.json in the table dir;
+    # without it vLLM aborts with FileNotFoundError on the worker.
+    "config.json"
 )
 missing=()
 for f in "${ENGRAM_FILES[@]}"; do

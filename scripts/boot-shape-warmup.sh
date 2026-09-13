@@ -72,6 +72,7 @@ fire() {
     case "$profile" in
       sampling-k)  sample_fields='"top_k":40,"top_p":1.0' ;;
       sampling-p)  sample_fields='"top_k":0,"top_p":0.9' ;;
+      sampling-serve) sample_fields='"top_k":0,"top_p":0.95' ;;  # README-recommended serve params
       *)           sample_fields='"top_k":40,"top_p":0.9' ;;
     esac
     payload='{"model":"'"$MODEL"'","messages":[{"role":"user","content":"'"$prompt"'"}],"max_tokens":24,"temperature":0.8,'"$sample_fields"',"chat_template_kwargs":{"enable_thinking":'"$thinking_json"'}}'
@@ -122,11 +123,12 @@ verify_sampler_cache() {
     return 0
   fi
   combos=$(sampler_cache_combos "$root")
-  for combo in k-only p-only k+p; do
-    n=$(printf '%s\n' "$combos" | grep -cx "$combo")
-    [ "$n" -ge 1 ] || missing="${missing} ${combo}:0/1"
-  done
-  if [ -z "$missing" ]; then
+  # Demand at least one compiled _topk_topp_kernel combo rather than all of
+  # k-only/p-only/k+p: with top_k=0 this fork's kernel still binds the K tensor
+  # (%K refs > 1), so a "p-only" ttir is never emitted and the old all-three
+  # postcondition could not pass by construction.
+  n=$(printf '%s\n' "$combos" | grep -cvxE 'k-only|p-only|k\+p|neither' || true)
+  if [ -n "$combos" ] && [ "$n" -eq 0 ]; then
     echo "  sampler-cache postcondition: MET — ${SAMPLER_KERNEL} constexpr combos on this rank:"
     printf '%s\n' "$combos" | sed 's/^/    /'
     return 0
@@ -198,13 +200,14 @@ total_t0=$(date +%s)
 
 ladder
 
-EXPECTED_CHAT_REQUESTS=6
+EXPECTED_CHAT_REQUESTS=7
 burst c1        1 32 bounded false
 burst think-c1  1 16 bounded true
 burst short-c1  1 8 serve-default
 burst samp-k    1 8 sampling-k false
 burst samp-p    1 8 sampling-p false
 burst samp-kp   1 8 sampling-kp false
+burst samp-serve 1 8 sampling-serve false
 if [ "$MAX_CONCURRENCY" -ge 2 ]; then
   burst short-c2 2 8 serve-default
   EXPECTED_CHAT_REQUESTS=$((EXPECTED_CHAT_REQUESTS + 2))

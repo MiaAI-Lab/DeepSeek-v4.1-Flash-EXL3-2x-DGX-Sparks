@@ -914,7 +914,10 @@ sync_dir_to_worker() {
 from pathlib import Path
 p = Path("$src")
 parts = []
-for f in sorted(p.glob("model-*.safetensors")):
+# Fingerprint every regular file, not just model-*.safetensors: a changed
+# config.json or index otherwise leaves the marker stale and the worker
+# boots against an old tree ("already in sync" skips the rsync).
+for f in sorted(x for x in p.iterdir() if x.is_file()):
     st = f.stat()
     parts.append(f"{f.name}:{st.st_size}:{int(st.st_mtime)}")
 print("|".join(parts) or "empty")
