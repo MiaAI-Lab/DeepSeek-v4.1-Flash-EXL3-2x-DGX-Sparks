@@ -1,0 +1,35 @@
+{
+  "model": "DeepSeek-v4.1-Flash-EXL3",
+  "seeds": [
+    11,
+    23,
+    47
+  ],
+  "max_tokens": 512,
+  "temperature": 1.0,
+  "top_p": 0.95,
+  "stream": true,
+  "stream_options": {
+    "include_usage": true
+  },
+  "warmup": {
+    "prompt": "Explain why durable transactions need a commit record.",
+    "max_tokens": 32,
+    "seed": 11,
+    "thinking": false
+  },
+  "cases": {
+    "poetry": {
+      "prompt": "Write a long original free-verse poem in twelve sections, roughly 1200 words. Its speaker is an aging municipal night gardener who tends traffic islands in a desert city during a meteor shower. Let the poem move through specific plants, overheard speech, childhood memories, broken irrigation and a quietly comic encounter with a lost astronomer. Use precise sensory images, varied line lengths, surprising but intelligible associations, and an unresolved ending. Avoid stock cosmic imagery, generic inspirational language, rhyme schemes, an explanatory introduction or commentary.",
+      "thinking": false
+    },
+    "code": {
+      "prompt": "Implement a production-quality asynchronous Python request coalescer with TTL caching. Concurrent callers for the same key share one loader task. Cancelling one waiter must not cancel the shared work. Failed loads must not poison the cache. Bound completed entries with LRU eviction and limit concurrent loader tasks using a semaphore. Use monotonic time and expose explicit shutdown. Explain the tricky races and provide focused asyncio tests. Be thorough.",
+      "thinking": false
+    },
+    "incident": {
+      "prompt": "Investigate this production incident. We operate a three-zone order service with PostgreSQL and an asynchronous cache invalidation bus. The database transaction commits before the invalidation event is published. At 09:02 zone B loses its bus connection for 90 seconds. At 09:03 a customer cancels order 817, and the database records version 19. Zone A reads version 19 but zone B keeps returning cached version 18, even after reconnecting. At 09:05 a retry worker resubmits an old payment job and the customer is charged. Cache entries have a ten-minute TTL; the publisher uses at-least-once delivery; consumers checkpoint every 100 events; payment idempotency keys currently include the retry attempt number. Work through the possible causal sequence, distinguish evidence from hypotheses, propose a safe mitigation and durable corrections, and design focused failure-injection tests. Give a rigorous and detailed engineering answer.",
+      "thinking": true
+    }
+  }
+}
