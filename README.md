@@ -356,6 +356,31 @@ Four things this vLLM build needs on GB10:
 - **Hang detector**: `start.sh` dumps py-spy stacks of both ranks (`logs/hang-*-pyspy.txt`) when the
   head log goes quiet for 420 s during boot.
 
+### GB10-shaped `exl3_moe` (`DSV41_EXL3_MOE_X`)
+
+exllamav3's fused MoE decode kernel runs at 54–63 % of GB10's bandwidth: one 512-thread block
+per SM (128 registers fill the register file, and the launch requests 90 KB of shared memory it
+does not use), ~3 KB of trellis in flight per SM through a 3-stage cp.async ring, and `barrier`
+the dominant stall in Nsight Compute. `overlay/moex/` builds the same kernel body with six
+cp.async stages, two fragment stages and two blocks per SM (`exl3_moe_x_ext`, compile-time
+K = 2/3/4 instances — a runtime-K switch spills its registers and loses the gain).
+`DSV41_EXL3_MOE_X=2,12,8` (the `.env.example` default) routes the fused launch through it:
+
+| | shipped | `2,12,8` |
+|---|---:|---:|
+| K=3 launch, M=4 / 24 experts, standalone | 1,065 µs (150 GB/s) | 765 µs (208 GB/s) |
+| K=3 launch in situ (rank-0 trace) | 862 µs | 619 µs |
+| 4-token verify step | 72 ms | 60 ms |
+| ×1 easy prose / code / hard prose | 42–50 / 45–47 / 26–30 tok/s | 63–66 / 56–57 / 32 |
+| ×2 aggregate | 75.7 | 97 |
+| WikiText-2 64×512 perplexity, paired | 6.305987 | 6.2994 (−0.10 % [−0.29, +0.08]) |
+
+Output is identical to the shipped kernel to 6e-8 at group size 8 (same split-K slice order).
+Prefill is unchanged: only experts with ≤ `EXL3_TEMP_ROWS_FUSED` rows take this path. Empty
+`DSV41_EXL3_MOE_X` restores the shipped kernel. Both containers must see the variable (it is in
+`serve_env` and in the head's explicit `-e` list). `overlay/moex/moe_bench.py` reproduces the
+standalone numbers from 48 extracted experts.
+
 ## Performance
 
 | Streams | Aggregate | Per stream | TTFT |
