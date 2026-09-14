@@ -32,7 +32,7 @@ hf_cli() {
     fi
 }
 
-have=$(find "$MODEL_HOST" -maxdepth 1 -name 'model-*.safetensors' 2>/dev/null | wc -l | tr -d '[:space:]')
+have=$(find "$MODEL_HOST" -maxdepth 1 -name 'model-*.safetensors' 2>/dev/null | wc -l | tr -d '[:space:]' || true)
 echo "EXL3    $MODEL_HOST  ${have:-0}/$EXPECTED_SHARDS shards"
 if [ "${have:-0}" -lt "$EXPECTED_SHARDS" ] || [ ! -f "$MODEL_HOST/config.json" ]; then
     echo "fetching $HF_MODEL_REPO -> $MODEL_HOST"
@@ -53,14 +53,24 @@ echo "Engram  $ENGRAM_DIR  $(( ${#ENGRAM_FILES[@]} - ${#missing[@]} ))/${#ENGRAM
 if [ "${#missing[@]}" -gt 0 ]; then
     echo "fetching $HF_ENGRAM_REPO (shards 47+48 only) -> $ENGRAM_DIR"
     mkdir -p "$ENGRAM_DIR"
-    inc=()
-    for f in "${ENGRAM_FILES[@]}"; do inc+=(--include "$f"); done
-    hf_cli download "$HF_ENGRAM_REPO" "${inc[@]}" --local-dir "$ENGRAM_DIR" --max-workers "${HF_MAX_WORKERS:-8}"
+    # Pass the files as positionals. `--include` (nargs='*') silently matched
+    # nothing with huggingface_hub 0.36 on the LFS shards.
+    hf_cli download "$HF_ENGRAM_REPO" "${missing[@]}" --local-dir "$ENGRAM_DIR" --max-workers "${HF_MAX_WORKERS:-8}"
 fi
 
-have=$(find "$MODEL_HOST" -maxdepth 1 -name 'model-*.safetensors' 2>/dev/null | wc -l | tr -d '[:space:]')
+# The file-backed Engram backend reads engram_layer_ids / engram_num_embeddings
+# from the native config.json next to the shards. It is tiny and not matched by
+# the shard --include filter, so fetch it explicitly by name.
+if [ ! -f "$ENGRAM_DIR/config.json" ]; then
+    echo "fetching $HF_ENGRAM_REPO config.json -> $ENGRAM_DIR"
+    mkdir -p "$ENGRAM_DIR"
+    hf_cli download "$HF_ENGRAM_REPO" config.json --local-dir "$ENGRAM_DIR" --max-workers "${HF_MAX_WORKERS:-8}"
+fi
+
+have=$(find "$MODEL_HOST" -maxdepth 1 -name 'model-*.safetensors' 2>/dev/null | wc -l | tr -d '[:space:]' || true)
 [ "${have:-0}" -ge "$EXPECTED_SHARDS" ] || { echo "still ${have:-0}/$EXPECTED_SHARDS EXL3 shards" >&2; exit 1; }
 for f in "${ENGRAM_FILES[@]}"; do
     [ -f "$ENGRAM_DIR/$f" ] || { echo "missing $ENGRAM_DIR/$f" >&2; exit 1; }
 done
+[ -f "$ENGRAM_DIR/config.json" ] || { echo "missing $ENGRAM_DIR/config.json" >&2; exit 1; }
 echo "complete. ./start.sh will NFS-share both trees to the worker (WEIGHT_SYNC=nfs)."

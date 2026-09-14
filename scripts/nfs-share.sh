@@ -21,6 +21,13 @@ NFS_DOCKERFILE_DIR="${NFS_DOCKERFILE_DIR:-$SCRIPT_DIR/files/nfs-server}"
 HF_EXPORT_ROOT="${HF_EXPORT_ROOT:-$HOME/.cache/huggingface}"
 NFS_OPTS_CLIENT="${NFS_OPTS_CLIENT:-nfsvers=4.2,ro,nconnect=8,rsize=1048576,wsize=1048576,hard,timeo=600}"
 NFS_SHARE="${NFS_SHARE:-1}"
+# kernel nfsd refuses to export an overlayfs directory ("/export does not
+# support NFS export"). This box only had the nfs-server image to build, so
+# /export lives on container overlayfs. Mounting an empty host dir at /export
+# makes it a real (ext4) mountpoint; the data trees are nested bind mounts and
+# become reachable with crossmnt.
+NFS_EXPORT_ROOT="${NFS_EXPORT_ROOT:-${CACHE_ROOT:-$HOME/.cache/vllm-dsv41-flash-exl3}/nfs-export}"
+NFS_OPTS="${NFS_OPTS:-ro,sync,no_subtree_check,no_root_squash,insecure,fsid=0,crossmnt}"
 
 # Export ACL. Defaults to the /24 the export is served on plus the worker's own
 # address, because the worker may mount over a different link than it is reached
@@ -115,11 +122,14 @@ nfs_ensure_server() {
     docker build -q -t "$NFS_IMAGE" "$NFS_DOCKERFILE_DIR" >/dev/null
     docker rm -f "$NFS_CONTAINER" >/dev/null 2>&1 || true
     log "exporting EXL3 + slim Engram via NFS (clients: $clients)"
+    mkdir -p "$NFS_EXPORT_ROOT"
     docker run -d --name "$NFS_CONTAINER" --restart unless-stopped \
         --privileged --network host \
+        -v "$NFS_EXPORT_ROOT:/export" \
         -v "$MODEL_HOST:/export/${NFS_EXPORT_MODEL}:ro" \
         -v "$ENGRAM_SRC:/export/${NFS_EXPORT_ENGRAM}:ro" \
         -e "NFS_CLIENTS=$clients" \
+        -e "NFS_OPTS=${NFS_OPTS}" \
         "$NFS_IMAGE" >/dev/null
     local i
     for i in $(seq 1 20); do
