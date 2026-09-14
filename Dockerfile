@@ -30,6 +30,11 @@ COPY overlay/exl3_fat_moe.cuh /opt/dsv41/exl3-fat-kernel/exl3_fat_moe.cuh
 COPY overlay/e3v2/exl3_fat_moe.cu /opt/dsv41/e3v2/exl3_fat_moe.cu
 COPY overlay/e3v2/exl3_fat_moe.cuh /opt/dsv41/e3v2/exl3_fat_moe.cuh
 COPY overlay/build_exl3_fat_moe_ext.py /opt/dsv41/build_exl3_fat_moe_ext.py
+# GB10-shaped exl3_moe (6 cp.async stages, 2 fragment stages, 2 blocks per SM; compile-time
+# K=2/3/4 instances): additive exl3_moe_x_ext module, same layered path as the E3 v2 kernels.
+COPY overlay/moex/exl3_moe_x.cu /opt/dsv41/moex/exl3_moe_x.cu
+COPY overlay/moex/exl3_moe_x.cuh /opt/dsv41/moex/exl3_moe_x.cuh
+COPY overlay/moex/build_moe_x.py /opt/dsv41/moex/build_moe_x.py
 
 # v0.0.43 fused exl3_moe TORCH_CHECKs mcg-only. This checkpoint is mul1.
 # v1.4.5 instantiates cb1 (mcg) and cb2 (mul1) fused MoE kernels.
@@ -111,6 +116,16 @@ RUN set -eux; \
     python3 /opt/dsv41/build_exl3_fat_moe_ext.py --src /opt/dsv41/e3v2 --out /tmp/e3v2 --arch 121a --install "$PY_SITE"; \
     python3 -c "import torch, exl3_fat_moe_ext as m; assert int(m.exl3_fat_moe_abi()) == 2; print('exl3_fat_moe_ext abi', int(m.exl3_fat_moe_abi()))"; \
     rm -rf /tmp/e3v2
+
+# GB10-shaped exl3_moe: the shipped 16-row decode instance is barrier-bound at one block per SM on
+# SM121 (54-63 % of bandwidth); six cp.async stages, two fragment stages and two blocks per SM
+# reach 87 % (1.4x per launch, identical output at group size 8). Selected at runtime with
+# DSV41_EXL3_MOE_X (.env); the shipped kernel stays the default when it is unset.
+RUN set -eux; \
+    PY_SITE="$(python3 -c 'import site; print(site.getsitepackages()[0])')"; \
+    python3 /opt/dsv41/moex/build_moe_x.py --src /opt/dsv41/moex --out /tmp/moex --arch 121a --install "$PY_SITE"; \
+    python3 -c "import torch, exl3_moe_x_ext as m; assert int(m.moex_variant_index(2, 3)) >= 0; print('exl3_moe_x_ext variants', int(m.moex_num_variants()))"; \
+    rm -rf /tmp/moex
 
 # Python overlay AFTER the CUDA compile so edits do not rebuild exllamav3_ext.
 COPY overlay/exl3.py /opt/dsv41/exl3.py
