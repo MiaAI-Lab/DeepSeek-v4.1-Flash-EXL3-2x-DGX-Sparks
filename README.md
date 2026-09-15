@@ -21,6 +21,13 @@ The image overlays EXL3 onto `vllm/vllm-openai:deepseekv41-flash-0909`
 (linux/arm64, vLLM `0.1.dev20904+g179dd0fa9`), the only base carrying the
 `DeepseekV41` architecture.
 
+### Experimental native vision
+
+An [opt-in SM121 vision variant](docs/experimental-vision.md) pins the expanded
+FlashInfer image-attention kernels while retaining the text-only defaults.
+Short-image concurrency has been tested with three active requests; a clean
+rebuild of the final packaging and full-context stress tests remain unverified.
+
 ## What this checkpoint is
 
 | | |

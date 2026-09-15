@@ -66,6 +66,7 @@ _cli_mnbt="${MAX_NUM_BATCHED_TOKENS-}"
 _cli_image="${IMAGE-}"
 _cli_util="${GPU_MEM_UTIL-}"
 _cli_lm="${LANGUAGE_MODEL_ONLY-}"
+_cli_vision="${DSV41_SM12X_VISION-}"
 _cli_max_num_seqs="${MAX_NUM_SEQS-}"
 _cli_max_model_len="${MAX_MODEL_LEN-}"
 _cli_spinwait_ms_set="${GLM53_SPINWAIT_MS+1}"
@@ -88,6 +89,7 @@ set +a
 [ -n "${_cli_image}" ] && IMAGE="$_cli_image"
 [ -n "${_cli_util}" ] && GPU_MEM_UTIL="$_cli_util"
 [ -n "${_cli_lm}" ] && LANGUAGE_MODEL_ONLY="$_cli_lm"
+[ -n "${_cli_vision}" ] && DSV41_SM12X_VISION="$_cli_vision"
 [ -n "${_cli_max_num_seqs}" ] && MAX_NUM_SEQS="$_cli_max_num_seqs"
 [ -n "${_cli_max_model_len}" ] && MAX_MODEL_LEN="$_cli_max_model_len"
 [ -n "${_cli_spinwait_ms_set}" ] && GLM53_SPINWAIT_MS="$_cli_spinwait_ms"
@@ -163,6 +165,7 @@ EXL3_OVERLAY_HOST="${EXL3_OVERLAY_HOST:-$SCRIPT_DIR/overlay/exl3.py}"
 KMAP_HOST="${KMAP_HOST:-$SCRIPT_DIR/files/exl3_k_map.json}"
 QUANTIZATION="${QUANTIZATION:-exl3}"
 LANGUAGE_MODEL_ONLY="${LANGUAGE_MODEL_ONLY:-0}"
+DSV41_SM12X_VISION="${DSV41_SM12X_VISION:-0}"
 SKIP_MM_PROFILING="${SKIP_MM_PROFILING:-1}"
 if [ -z "${LIMIT_MM:-}" ]; then
     LIMIT_MM='{"image":100}'
@@ -1061,6 +1064,9 @@ fi
 if [ -n "${CHAT_TEMPLATE:-}" ] && [ -f "${CHAT_TEMPLATE}" ]; then
     ARGS+=(--chat-template "${CHAT_TEMPLATE}")
 fi
+if [ "${DSV41_SM12X_VISION:-0}" = "1" ]; then
+    python3 /opt/dsv41/patch_sm12x_vision.py --check
+fi
 if [ "${LANGUAGE_MODEL_ONLY:-0}" = "1" ]; then
     ARGS+=(--language-model-only)
     say "language-model-only: no vision tower"
@@ -1156,6 +1162,9 @@ elif [ "${SPEC_METHOD:-dspark}" = "none" ]; then
 fi
 if [ -n "${CHAT_TEMPLATE:-}" ] && [ -f "${CHAT_TEMPLATE}" ]; then
     ARGS+=(--chat-template "${CHAT_TEMPLATE}")
+fi
+if [ "${DSV41_SM12X_VISION:-0}" = "1" ]; then
+    python3 /opt/dsv41/patch_sm12x_vision.py --check
 fi
 if [ "${LANGUAGE_MODEL_ONLY:-0}" = "1" ]; then
     ARGS+=(--language-model-only)
@@ -1377,7 +1386,7 @@ launch_cluster() {
     for v in SERVED_MODEL_NAME PORT TP NNODES HEAD_IP MASTER_PORT QUANTIZATION \
              MAX_MODEL_LEN GPU_MEM_UTIL MAX_NUM_SEQS MAX_NUM_BATCHED_TOKENS \
              KV_CACHE_DTYPE SPEC_METHOD DSPARK_TOKENS \
-             LANGUAGE_MODEL_ONLY SKIP_MM_PROFILING \
+             LANGUAGE_MODEL_ONLY DSV41_SM12X_VISION SKIP_MM_PROFILING \
              LIMIT_MM CHAT_TEMPLATE ENFORCE_EAGER EXL3_FUSED_MOE EXL3_MOE_ROW_TILE \
              EXL3_TEMP_ROWS_FUSED EXL3_FAT_SORTED EXL3_FAT_BATCHED EXL3_FAT_KERNEL \
              EXL3_FAT_GROUPED MODEL_DIR ENGRAM_MOUNT EXTRA_ARGS \
@@ -1491,6 +1500,7 @@ launch_cluster() {
         -e SPEC_METHOD="$SPEC_METHOD" \
         -e DSPARK_TOKENS="${DSPARK_TOKENS:-5}" \
         -e LANGUAGE_MODEL_ONLY="$LANGUAGE_MODEL_ONLY" \
+        -e DSV41_SM12X_VISION="$DSV41_SM12X_VISION" \
         -e SKIP_MM_PROFILING="$SKIP_MM_PROFILING" \
         -e LIMIT_MM="$LIMIT_MM" \
         -e CHAT_TEMPLATE="$CHAT_TEMPLATE" \

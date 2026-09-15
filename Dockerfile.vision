@@ -1,0 +1,9 @@
+# Optional experimental image; the default Dockerfile and image are unchanged.
+FROM ghcr.io/miaai-lab/deepseek-v4.1-flash-exl3-2x-dgx-sparks@sha256:2f0cf3adc0f989c1d446be274df864eb799630175f604c3b22b71b7205971dce
+ENV FLASHINFER_CUDA_ARCH_LIST=12.1a MAX_JOBS=1 DSV41_SM12X_VISION=0
+COPY scripts/build_vision_flashinfer.py /opt/dsv41/build_vision_flashinfer.py
+RUN python3 /opt/dsv41/build_vision_flashinfer.py
+COPY overlay/patch_sm12x_vision.py /opt/dsv41/patch_sm12x_vision.py
+RUN python3 /opt/dsv41/patch_sm12x_vision.py && python3 /opt/dsv41/test_sm120_block64.py
+LABEL org.opencontainers.image.description="Experimental SM121 native-vision variant; text-only defaults retained" \
+      org.miaai.flashinfer.revision="453aa7c7296e9ec711fd4c1f3aa6ee061a6b69dc"
