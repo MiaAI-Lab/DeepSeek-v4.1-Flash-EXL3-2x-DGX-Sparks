@@ -115,10 +115,12 @@ nfs_ensure_server() {
     docker build -q -t "$NFS_IMAGE" "$NFS_DOCKERFILE_DIR" >/dev/null
     docker rm -f "$NFS_CONTAINER" >/dev/null 2>&1 || true
     log "exporting EXL3 + slim Engram via NFS (clients: $clients)"
+    # Export one real filesystem-backed bind mount. Exporting /export while
+    # only its children are bind mounts leaves /export on overlayfs, which
+    # kernel nfsd rejects with "does not support NFS export".
     docker run -d --name "$NFS_CONTAINER" --restart unless-stopped \
         --privileged --network host \
-        -v "$MODEL_HOST:/export/${NFS_EXPORT_MODEL}:ro" \
-        -v "$ENGRAM_SRC:/export/${NFS_EXPORT_ENGRAM}:ro" \
+        -v "$HF_EXPORT_ROOT:/export:ro" \
         -e "NFS_CLIENTS=$clients" \
         "$NFS_IMAGE" >/dev/null
     local i
@@ -142,11 +144,6 @@ nfs_hardlink_tree() {
 }
 
 nfs_publish() {
-    if [ "${NFS_REUSE_EXPORT:-0}" != "1" ]; then
-        NFS_DEVICE_MODEL=":/${NFS_EXPORT_MODEL}"
-        NFS_DEVICE_ENGRAM=":/${NFS_EXPORT_ENGRAM}"
-        return 0
-    fi
     local model_dst engram_dst n
     model_dst="${HF_EXPORT_ROOT}/${NFS_EXPORT_MODEL}"
     engram_dst="${HF_EXPORT_ROOT}/${NFS_EXPORT_ENGRAM}"
@@ -204,8 +201,11 @@ nfs_worker_has_file() {
 nfs_share() {
     [ "$NFS_SHARE" = "0" ] && die "NFS_SHARE=0 but weight backend is nfs"
     [ -n "$(nfs_server_ip)" ] || die "cannot work out which address to export EXL3 on: no route from this host to WORKER_IP=${WORKER_IP:-unset}. Set NFS_SERVER_IP (and NFS_CLIENTS) in .env."
-    nfs_ensure_server
+    # Populate the filesystem-backed export before starting nfsd. The files
+    # are hardlinks, so this consumes directory entries rather than another
+    # ~387 GiB weight copy.
     nfs_publish
+    nfs_ensure_server
     nfs_ensure_worker_volume "$NFS_VOLUME_MODEL" "${NFS_DEVICE_MODEL:-:/${NFS_EXPORT_MODEL}}"
     nfs_ensure_worker_volume "$NFS_VOLUME_ENGRAM" "${NFS_DEVICE_ENGRAM:-:/${NFS_EXPORT_ENGRAM}}"
     if nfs_worker_has_file "$NFS_VOLUME_MODEL" "config.json"; then

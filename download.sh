@@ -3,8 +3,8 @@
 #
 # EXL3 weights (39 shards, ~197 GiB) come from HF_MODEL_REPO into ./model.
 # Engram tables are never quantized and never copied into the EXL3 tree: only
-# shards 47+48 of the original 48-shard checkpoint (~95 GiB each) and the index
-# are pulled from HF_ENGRAM_REPO into ENGRAM_DIR.
+# shards 47+48 of the original 48-shard checkpoint (~95 GiB each), the index,
+# and config.json are pulled from HF_ENGRAM_REPO into ENGRAM_DIR.
 #
 # Resumable — re-run after an interruption. ./start.sh runs the same fetch
 # automatically, so this script is only for staging the download separately.
@@ -22,6 +22,10 @@ HF_MODEL_REPO="${HF_MODEL_REPO:-Mia-AiLab/DeepSeek-V4.1-Flash-EXL3-2.9bpw}"
 HF_ENGRAM_REPO="${HF_ENGRAM_REPO:-deepseek-ai/DeepSeek-V4.1-Flash}"
 EXPECTED_SHARDS="${EXPECTED_SHARDS:-39}"
 export HF_HUB_ENABLE_HF_TRANSFER="${HF_HUB_ENABLE_HF_TRANSFER:-1}"
+
+# With `set -euo pipefail`, probing a missing destination with find(1) exits
+# before the first download. A clean checkout has neither directory yet.
+mkdir -p "$MODEL_HOST" "$ENGRAM_DIR"
 
 hf_cli() {
     if command -v hf >/dev/null 2>&1; then hf "$@"
@@ -44,6 +48,7 @@ ENGRAM_FILES=(
     "model-00047-of-00048.safetensors"
     "model-00048-of-00048.safetensors"
     "model.safetensors.index.json"
+    "config.json"
 )
 missing=()
 for f in "${ENGRAM_FILES[@]}"; do
@@ -51,7 +56,7 @@ for f in "${ENGRAM_FILES[@]}"; do
 done
 echo "Engram  $ENGRAM_DIR  $(( ${#ENGRAM_FILES[@]} - ${#missing[@]} ))/${#ENGRAM_FILES[@]} files"
 if [ "${#missing[@]}" -gt 0 ]; then
-    echo "fetching $HF_ENGRAM_REPO (shards 47+48 only) -> $ENGRAM_DIR"
+    echo "fetching $HF_ENGRAM_REPO (shards 47+48 + index/config only) -> $ENGRAM_DIR"
     mkdir -p "$ENGRAM_DIR"
     inc=()
     for f in "${ENGRAM_FILES[@]}"; do inc+=(--include "$f"); done

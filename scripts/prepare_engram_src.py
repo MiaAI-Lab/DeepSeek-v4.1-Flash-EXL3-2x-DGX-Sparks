@@ -57,6 +57,10 @@ def prepare(src: Path, dst: Path) -> dict[str, object]:
         if not (src / shard).is_file():
             raise SystemExit(f"missing Engram shard {src / shard}")
 
+    cfg = src / "config.json"
+    if not cfg.is_file():
+        raise SystemExit(f"missing {cfg}")
+
     raw = json.loads(index_path.read_text())
     keep = slim_weight_map(raw.get("weight_map") or {})
     if not keep:
@@ -80,10 +84,8 @@ def prepare(src: Path, dst: Path) -> dict[str, object]:
         "weight_map": keep,
     }
     (dst / "model.safetensors.index.json").write_text(json.dumps(slim, indent=2) + "\n")
-    cfg = src / "config.json"
-    if cfg.is_file():
-        shutil.copy2(cfg, dst / "config.json")
-        actions["config.json"] = "copy"
+    shutil.copy2(cfg, dst / "config.json")
+    actions["config.json"] = "copy"
     return {"dst": str(dst), "tensors": sorted(keep), "files": actions}
 
 
