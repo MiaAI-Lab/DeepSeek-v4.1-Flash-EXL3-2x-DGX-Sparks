@@ -40,11 +40,12 @@ During an explicitly reserved test window, with competing inference stopped,
 use the experimental image and explicit launch overrides:
 
 ```bash
+SKIP_PULL=1 SKIP_BUILD=1 SKIP_SHIP=1 \
 IMAGE=dsv41-exl3:vision-experimental \
 LANGUAGE_MODEL_ONLY=0 DSV41_SM12X_VISION=1 \
 MAX_NUM_BATCHED_TOKENS=2048 MAX_NUM_SEQS=3 MAX_MODEL_LEN=150000 \
 KV_CACHE_MEMORY_BYTES=2684354560 \
-./start.sh up
+./start.sh
 ```
 
 Keep the existing memory guards. Set `LIMIT_MM` to `{"image":1}` through your
