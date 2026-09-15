@@ -56,10 +56,14 @@ Per node, from `scripts/weight_budget.py --tp 2`:
 | Context workspaces, CUDA context + NCCL, CUDA graphs | ~5–7 |
 | vLLM processes, OS, docker, desktop | ~9 |
 
-Shipped defaults: `MAX_MODEL_LEN=600000`, `MAX_NUM_SEQS=2`, `MAX_NUM_BATCHED_TOKENS=1024`, a
-2.5 GiB KV pool (774,400 tokens at 614400 ctx). That leaves the head **4.07–4.21 GiB**
-`MemAvailable` after warm-up; its real floor comes during a long *prefill*, not at boot —
-**2.1 GiB** at the end of a 601k prompt.
+Shipped defaults: `MAX_MODEL_LEN=600000`, `MAX_NUM_SEQS=2`,
+`MAX_NUM_BATCHED_TOKENS=1536`, `DSV41_IO_THREADS=96`, and a 2.5 GiB KV pool. The
+1536/96 pair is the measured agent-workload setting; the previous 1024/32 pair
+remains an easy low-resource override. The head has about **5.9 GiB**
+`MemAvailable` after a 34k agent replay. Its real floor comes during a long
+*prefill*, not at boot; the previous 1024-token chunk reached **2.1 GiB** at the
+end of a 601k prompt, while the new 1536 default has not yet been revalidated at
+that extreme length.
 
 `start.sh` enforces the rest: a boot-margin preflight, per-prefill allocator release, and a
 post-load page-cache drop. Engram tables are never pinned — the row store replaces vLLM's
@@ -388,10 +392,13 @@ drops to 23 tok/s but ×4 reaches **53.7 aggregate** — batch serving wants spe
 **Prefill, short prompts**: **1,041 / 1,008 / 965 tok/s** at 10k / 28k / 57k with the packed
 Engram shards (`./start.sh pack`, `DSV41_IO_THREADS=96`) and the E3 v2 grouped kernels
 (`EXL3_FAT_GROUPED=1`, `EXL3_TEMP_ROWS_FUSED=16`), at a 1536-token chunk. Run-to-run spread is
-about 10 %.
+about 10 %. On the current two-Spark lane, the same defaults measured **1,338 tok/s** on
+sparkDash's repetitive 32k prefill and **995 tok/s** median on a realistic 34,357-token Pi
+agent replay (three runs, 0 prefix-cache hits), up from 760 tok/s at 1024/32; median TTFT fell
+45.3 -> 34.6 s.
 
 **Prefill, long prompts** (`expandable_segments:True`, **2048**-token chunks,
-`LONG_PREFILL_TOKEN_THRESHOLD=1792`, single request). The shipped chunk is now 1024, which these
+`LONG_PREFILL_TOKEN_THRESHOLD=1792`, single request). The shipped chunk is now 1536, which these
 numbers do not cover:
 
 | Prompt | TTFT | tok/s | Steady-state decode at that context |

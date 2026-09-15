@@ -150,9 +150,10 @@ KV_BLOCK_SIZE="${KV_BLOCK_SIZE:-64}"
 MAX_MODEL_LEN="${MAX_MODEL_LEN:-600000}"
 GPU_MEM_UTIL="${GPU_MEM_UTIL:-0.88}"
 MAX_NUM_SEQS="${MAX_NUM_SEQS:-2}"
-# 2048: the prefill chunk bounds the activation peak (indexer scores every
-# chunk row against the whole prefix). 4096 was the 2026-09-11 setting.
-MAX_NUM_BATCHED_TOKENS="${MAX_NUM_BATCHED_TOKENS:-2048}"
+# 1536: measured agent-workload sweet spot; the prefill chunk bounds the
+# activation peak because the indexer scores every chunk row against the whole
+# prefix. 2048 is the older long-context setting.
+MAX_NUM_BATCHED_TOKENS="${MAX_NUM_BATCHED_TOKENS:-1536}"
 CHAT_TEMPLATE_HOST="${CHAT_TEMPLATE_HOST:-$SCRIPT_DIR/files/chat_template.jinja}"
 CHAT_TEMPLATE="${CHAT_TEMPLATE:-/opt/dsv41/chat_template.jinja}"
 STOP_PATCH_HOST="${STOP_PATCH_HOST:-$SCRIPT_DIR/overlay/patch_suppress_stops_in_reasoning.py}"
@@ -268,7 +269,7 @@ ENGRAM_MOUNT="${ENGRAM_MOUNT:-/engram-src}"
 # recipe; raise only after a clean boot shows headroom.
 DSV41_CACHE_GIB="${DSV41_CACHE_GIB:-0}"
 DSV41_RESIDENT_SCALES="${DSV41_RESIDENT_SCALES:-0}"
-DSV41_IO_THREADS="${DSV41_IO_THREADS:-32}"
+DSV41_IO_THREADS="${DSV41_IO_THREADS:-96}"
 DSV41_CACHE_WAYS="${DSV41_CACHE_WAYS:-4}"
 DSV41_STATS_SECONDS="${DSV41_STATS_SECONDS:-60}"
 # Host memory guard: kill the local container when MemAvailable drops under

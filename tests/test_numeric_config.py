@@ -137,10 +137,21 @@ def test_restart_validates_before_stop() -> None:
     assert validation < restart
 
 
+def test_agent_prefill_defaults() -> None:
+    source = START.read_text()
+    env_example = (ROOT / ".env.example").read_text()
+    assert 'MAX_NUM_BATCHED_TOKENS="${MAX_NUM_BATCHED_TOKENS:-1536}"' in source
+    assert 'DSV41_IO_THREADS="${DSV41_IO_THREADS:-96}"' in source
+    assert "MAX_NUM_BATCHED_TOKENS=1536" in env_example
+    assert "DSV41_IO_THREADS=96" in env_example
+    assert "LONG_PREFILL_TOKEN_THRESHOLD=\n" in env_example
+
+
 if __name__ == "__main__":
     test_matrix()
     test_decimal_normalization()
     test_indexer_workspace_enum()
     test_spinwait_numeric_contract()
     test_restart_validates_before_stop()
+    test_agent_prefill_defaults()
     print("numeric config tests: PASS")
