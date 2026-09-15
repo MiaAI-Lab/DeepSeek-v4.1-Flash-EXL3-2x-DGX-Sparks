@@ -159,6 +159,7 @@ STOP_PATCH_HOST="${STOP_PATCH_HOST:-$SCRIPT_DIR/overlay/patch_suppress_stops_in_
 SCHED_PATCH_HOST="${SCHED_PATCH_HOST:-$SCRIPT_DIR/overlay/patch_scheduler_decode_floor.py}"
 XGRAMMAR_PATCH_HOST="${XGRAMMAR_PATCH_HOST:-$SCRIPT_DIR/overlay/patch_xgrammar_termination.py}"
 SPINWAIT_PATCH_HOST="${SPINWAIT_PATCH_HOST:-$SCRIPT_DIR/overlay/patch_spinwait.py}"
+RESPONSES_PATCH_HOST="${RESPONSES_PATCH_HOST:-$SCRIPT_DIR/overlay/patch_responses_content_types.py}"
 EXL3_OVERLAY_HOST="${EXL3_OVERLAY_HOST:-$SCRIPT_DIR/overlay/exl3.py}"
 KMAP_HOST="${KMAP_HOST:-$SCRIPT_DIR/files/exl3_k_map.json}"
 QUANTIZATION="${QUANTIZATION:-exl3}"
@@ -211,7 +212,7 @@ MODEL_HOST="${MODEL_HOST:-$SCRIPT_DIR/model}"
 ENGRAM_DIR="${ENGRAM_DIR:-$SCRIPT_DIR/engram-src}"
 # Hub sources. The EXL3 weights are ours; the Engram tables are never
 # quantized and never copied into the EXL3 tree, so they come from the
-# original DeepSeek checkpoint (shards 47+48 and the index only).
+# original DeepSeek checkpoint (shards 47+48, the index, and config.json only).
 HF_MODEL_REPO="${HF_MODEL_REPO:-Mia-AiLab/DeepSeek-V4.1-Flash-EXL3-2.9bpw}"
 HF_ENGRAM_REPO="${HF_ENGRAM_REPO:-deepseek-ai/DeepSeek-V4.1-Flash}"
 # 1 = fetch whatever is missing before preflight checks it. 0 = only verify.
@@ -420,12 +421,14 @@ hf_fetch() {
         || die "download of ${label} from ${repo} failed (re-run ./start.sh to resume, or fetch by hand into ${dest})"
 }
 
-# Engram needs only shards 47+48 of the 48-shard original (~95 GiB each) plus
-# the index; the other 46 are never read. Do not pull the whole 476 GiB repo.
+# Engram needs only shards 47+48 of the 48-shard original (~95 GiB each), the
+# index, and config.json; the other 46 shards are never read. Do not pull the
+# whole 476 GiB repo.
 ENGRAM_FILES=(
     "model-00047-of-00048.safetensors"
     "model-00048-of-00048.safetensors"
     "model.safetensors.index.json"
+    "config.json"
 )
 
 engram_complete() {
@@ -532,6 +535,7 @@ preflight() {
     [ -f "$SCHED_PATCH_HOST" ] || die "$SCHED_PATCH_HOST missing"
     [ -f "$XGRAMMAR_PATCH_HOST" ] || die "$XGRAMMAR_PATCH_HOST missing"
     [ -f "$SPINWAIT_PATCH_HOST" ] || die "$SPINWAIT_PATCH_HOST missing"
+    [ -f "$RESPONSES_PATCH_HOST" ] || die "$RESPONSES_PATCH_HOST missing"
     [ -f "$EXL3_OVERLAY_HOST" ] || die "$EXL3_OVERLAY_HOST missing"
     [ -f "$KMAP_HOST" ] || die "$KMAP_HOST missing"
     [ -f "$CHAT_TEMPLATE_HOST" ] || die "$CHAT_TEMPLATE_HOST missing"
@@ -1034,6 +1038,7 @@ ARGS=(
     --reasoning-parser deepseek_v41
     --enable-auto-tool-choice
     --enable-prefix-caching
+    --enable-prompt-tokens-details
     --no-enable-flashinfer-autotune
     --hf-overrides "{\"engram_table_dir\":\"${ENGRAM_MOUNT}\"}"
 )
@@ -1082,6 +1087,7 @@ for p in /opt/dsv41/patch_suppress_stops_in_reasoning.py \
          /opt/dsv41/patch_scheduler_decode_floor.py \
          /opt/dsv41/patch_xgrammar_termination.py \
          /opt/dsv41/patch_spinwait.py \
+         /opt/dsv41/patch_responses_content_types.py \
          /opt/dsv41/patch_exl3_packed_names.py \
          /opt/dsv41/patch_exl3_lm_head.py \
          /opt/dsv41/patch_engram_secondary.py \
@@ -1130,6 +1136,7 @@ ARGS=(
     --reasoning-parser deepseek_v41
     --enable-auto-tool-choice
     --enable-prefix-caching
+    --enable-prompt-tokens-details
     --no-enable-flashinfer-autotune
     --hf-overrides "{\"engram_table_dir\":\"${ENGRAM_MOUNT}\"}"
 )
@@ -1176,6 +1183,7 @@ for p in /opt/dsv41/patch_suppress_stops_in_reasoning.py \
          /opt/dsv41/patch_scheduler_decode_floor.py \
          /opt/dsv41/patch_xgrammar_termination.py \
          /opt/dsv41/patch_spinwait.py \
+         /opt/dsv41/patch_responses_content_types.py \
          /opt/dsv41/patch_exl3_packed_names.py \
          /opt/dsv41/patch_exl3_lm_head.py \
          /opt/dsv41/patch_engram_secondary.py \
@@ -1266,6 +1274,7 @@ launch_cluster() {
     scp -q -o BatchMode=yes "$SCHED_PATCH_HOST" "${WORKER_SSH}:/tmp/patch_scheduler_decode_floor.py"
     scp -q -o BatchMode=yes "$XGRAMMAR_PATCH_HOST" "${WORKER_SSH}:/tmp/patch_xgrammar_termination.py"
     scp -q -o BatchMode=yes "$SPINWAIT_PATCH_HOST" "${WORKER_SSH}:/tmp/patch_spinwait.py"
+    scp -q -o BatchMode=yes "$RESPONSES_PATCH_HOST" "${WORKER_SSH}:/tmp/patch_responses_content_types.py"
     scp -q -o BatchMode=yes "$EXL3_OVERLAY_HOST" "${WORKER_SSH}:/tmp/dsv41-exl3.py"
     scp -q -o BatchMode=yes "$KMAP_HOST" "${WORKER_SSH}:/tmp/exl3_k_map.json"
     scp -q -o BatchMode=yes "$SCRIPT_DIR/overlay/patch_exl3_packed_names.py" "${WORKER_SSH}:/tmp/patch_exl3_packed_names.py"
@@ -1421,6 +1430,7 @@ launch_cluster() {
         -v '/tmp/patch_scheduler_decode_floor.py:/opt/dsv41/patch_scheduler_decode_floor.py:ro' \
         -v '/tmp/patch_xgrammar_termination.py:/opt/dsv41/patch_xgrammar_termination.py:ro' \
         -v '/tmp/patch_spinwait.py:/opt/dsv41/patch_spinwait.py:ro' \
+        -v '/tmp/patch_responses_content_types.py:/opt/dsv41/patch_responses_content_types.py:ro' \
         -v '/tmp/dsv41-exl3.py:/opt/dsv41/exl3.py:ro' \
         -v '/tmp/exl3_k_map.json:/opt/dsv41/exl3_k_map.json:ro' \
         -v '/tmp/patch_exl3_packed_names.py:/opt/dsv41/patch_exl3_packed_names.py:ro' \
@@ -1460,6 +1470,7 @@ launch_cluster() {
         -v "$SCHED_PATCH_HOST:/opt/dsv41/patch_scheduler_decode_floor.py:ro" \
         -v "$XGRAMMAR_PATCH_HOST:/opt/dsv41/patch_xgrammar_termination.py:ro" \
         -v "$SPINWAIT_PATCH_HOST:/opt/dsv41/patch_spinwait.py:ro" \
+        -v "$RESPONSES_PATCH_HOST:/opt/dsv41/patch_responses_content_types.py:ro" \
         -v "$EXL3_OVERLAY_HOST:/opt/dsv41/exl3.py:ro" \
         -v "$KMAP_HOST:/opt/dsv41/exl3_k_map.json:ro" \
         -v "$SCRIPT_DIR/overlay/patch_exl3_packed_names.py:/opt/dsv41/patch_exl3_packed_names.py:ro" \
@@ -1681,7 +1692,7 @@ on_ready() {
     log "DeepSeek-V4.1-Flash EXL3 is UP (TP=${TP}, nnodes=${NNODES})"
     log "  endpoints  : http://127.0.0.1:${PORT}/v1   (LAN: ${HEAD_IP}:${PORT})"
     log "  model name : ${SERVED_MODEL_NAME}"
-    log "  weights    : ${MODEL_HOST}  quant=${QUANTIZATION}  kv=${KV_CACHE_DTYPE:-native-fp4}  sync=${WEIGHT_SYNC}/${WEIGHT_BACKEND:-}"
+    log "  weights    : ${MODEL_HOST}  quant=${QUANTIZATION}  kv=${KV_CACHE_DTYPE:-auto (fp8_ds_mla)}  sync=${WEIGHT_SYNC}/${WEIGHT_BACKEND:-}"
     log "  engram     : file-backed ${ENGRAM_SRC} (no 47GiB pin; packed=${HEAD_PACKED_DIR}) worker=${WORKER_ENGRAM_BIND}"
     local vision=on
     [ "${LANGUAGE_MODEL_ONLY}" = "1" ] && vision=off

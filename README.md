@@ -142,7 +142,7 @@ the worker is short of disk.
 | Source | Into | Size |
 |---|---|---:|
 | [`Mia-AiLab/DeepSeek-V4.1-Flash-EXL3-2.9bpw`](https://huggingface.co/Mia-AiLab/DeepSeek-V4.1-Flash-EXL3-2.9bpw) — 39 EXL3 shards | `MODEL_HOST` (`./model`) | ~197 GiB |
-| [`deepseek-ai/DeepSeek-V4.1-Flash`](https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash) — shards **47+48 and the index only** | `ENGRAM_DIR` (`./engram-src`) | ~190 GiB |
+| [`deepseek-ai/DeepSeek-V4.1-Flash`](https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash) — shards **47+48**, index, and `config.json` only | `ENGRAM_DIR` (`./engram-src`) | ~190 GiB |
 
 Engram tables are never quantized and never copied into the EXL3 tree, which is
 why they come from the original checkpoint; the other 46 shards are never read.
@@ -192,7 +192,7 @@ Official sampling for real work: `temperature=1.0`, `top_p=0.95`, and leave thin
 | Path | Role |
 |---|---|
 | `model/` | EXL3 2.9 bpw checkpoint (this workspace) |
-| `ENGRAM_DIR` | Engram tables: shards 47+48 + index of the original `DeepSeek-V4.1-Flash` (`./engram-src`, auto-fetched) |
+| `ENGRAM_DIR` | Engram tables: shards 47+48 + index + config of the original `DeepSeek-V4.1-Flash` (`./engram-src`, auto-fetched) |
 | `start.sh` | 2-node launcher (`start` / `share` / `pack` / `stop` / `restart` / `status` / `logs`) |
 | `Dockerfile` | `vllm-openai:deepseekv41-flash-0909` + SM121 EXL3 ext + the overlay |
 | `overlay/exl3.py` | Packed mul1 loader + apply: routed MoE, attn/shared/engram wkv linears, pinned H2D staging, pre-tune |
@@ -276,8 +276,8 @@ Then set `WEIGHT_SYNC=zfs` **in `.env`** and run `./start.sh`.
 > in it. Knobs absent from `.env` (`BUILD`, `PULL`, `SKIP_BUILD`, `SKIP_PULL`,
 > `SKIP_SHIP`, `SKIP_SYNC`, `FORCE_SYNC`) do work as one-shot prefixes.
 
-Populate `models/dsv41-engram` with shards 47+48 and the index only — never
-send the 476 GiB native tree. Override `ZFS_POOL` and the four dataset names in
+Populate `models/dsv41-engram` with shards 47+48, the index, and `config.json`
+only — never send the 476 GiB native tree. Override `ZFS_POOL` and the four dataset names in
 `.env`; `start.sh` falls back to the streaming path if the pool or the worker's
 `zfs recv` is not reachable. `WEIGHT_SYNC=rsync` is the third option: a plain
 node-local copy with no pool, and no incremental updates.
@@ -301,6 +301,7 @@ Host-side (pure source/JSON checks — no torch, no vLLM):
 ```bash
 python3 tests/test_numeric_config.py
 python3 tests/test_engram_src.py
+python3 tests/test_responses_content_types.py
 python3 tests/test_engram_secondary.py
 python3 tests/test_k_map.py
 python3 tests/test_memory_log.py
