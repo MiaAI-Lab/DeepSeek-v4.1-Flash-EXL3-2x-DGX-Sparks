@@ -405,6 +405,21 @@ Two fresh 100k prompts at once: 973 tok/s aggregate. A 17-token chat sent into a
 prefill answers in **3.6 s**. Head `MemAvailable` 4.07–4.21 GiB after warm-up, low-water
 2.56 GiB at 455k and 2.1 GiB at 601k; worker 5.8 GiB.
 
+### Fresh-kit replication (2× GB10, WEIGHT_SYNC=rsync)
+
+Same class of box on a bare install, curl-measured TTFT through the API port, filler prompts:
+
+- Prefill ~12–13k tokens, unpacked Engram: **~846 tok/s** (TTFT 14.8 s)
+- Same with `./start.sh pack`: **~1,040 tok/s** (+23 %, TTFT 12.2 s) — matches the packed 10k
+  figure above despite different filler text
+- Identical re-prompt (prefix cache): TTFT < 1 s
+- `MAX_NUM_BATCHED_TOKENS` 1024 vs 2048 on ≤13k prompts: **no measurable difference** —
+  consistent with the long-prompt table above where 2048 chunks were measured at 50k+
+- First sampled request per `(top_k, top_p)` constexpr combo JIT-compiles
+  `_topk_topp_kernel` mid-serve (observed 123 s TTFT for a ~1k-token agent prompt);
+  the compiled variants persist on disk in the vLLM Triton cache, so the cost is
+  one-time per combo per install
+
 ## License
 
 Launcher/overlay: AGPL-3.0, plus MIT for files that carry `LICENSE.MIT`.
