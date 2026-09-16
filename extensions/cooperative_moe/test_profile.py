@@ -1,5 +1,6 @@
 """CPU-only checks for profile integrity, path quoting, and exclusive creation."""
 
+import ast
 import hashlib
 import sys
 import tempfile
@@ -88,6 +89,22 @@ class ProfileTests(unittest.TestCase):
             with self.subTest(path=path), self.assertRaises(ValueError):
                 self.generate(path)
             self.assertFalse(self.output.exists())
+
+
+class SourcePinTests(unittest.TestCase):
+    def test_checked_in_adapter_matches_profile_pin(self):
+        root = Path(__file__).resolve().parent
+        runtime = root / "runtime.py"
+        self.assertEqual(
+            hashlib.sha256(runtime.read_bytes()).hexdigest(),
+            prepare_profile.ADAPTER_SHA,
+        )
+        assignments = {
+            node.targets[0].id: node.value
+            for node in ast.parse(runtime.read_text()).body
+            if isinstance(node, ast.Assign) and isinstance(node.targets[0], ast.Name)
+        }
+        self.assertEqual(ast.literal_eval(assignments["SHA256"]), prepare_profile.BINARY_SHA)
 
 
 if __name__ == "__main__":

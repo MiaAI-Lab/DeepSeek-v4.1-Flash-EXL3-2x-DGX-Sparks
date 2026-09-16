@@ -30,6 +30,14 @@ for protocols, sample counts, numerical tolerances, and remaining validation.
 K4 MTP, larger prefill batches, mixed metadata, and unsupported shapes use stock
 dispatch. Scratch is allocated after weight loading and before graph capture.
 The adapter never retries stock after a partially launched CUDA operation.
+Native hash/ABI/layout/occupancy checks and K2/K3 preparation remain active under
+Python `-O`. One workspace is shared per device: ubatching/DBO environment flags
+and matching `EXTRA_ARGS` are rejected in addition to the required stream flags.
+Custom integrations must also prevent overlapping launches on other streams.
+
+Startup distinguishes wrapper installation, native preparation, and eligible
+layer counts. Selection logs distinguish eager calls from graph capture; neither
+is a graph-replay counter. Geometry remains fixed at wide/wide (1).
 
 ## Build
 
@@ -96,6 +104,8 @@ CPU-only tests require Python 3.10+ and its standard library:
 python3 extensions/cooperative_moe/test_dispatch.py
 python3 extensions/cooperative_moe/test_profile.py
 python3 extensions/cooperative_moe/test_build.py
+python3 extensions/cooperative_moe/test_optimized_init.py
+python3 -O extensions/cooperative_moe/test_optimized_init.py
 bash -n extensions/cooperative_moe/build.sh extensions/cooperative_moe/archive_upstream.sh
 ```
 
@@ -104,8 +114,17 @@ stock fallback, invalid routes, and output casting. It requires the selected
 overlay, the recipe's `test_exl3_overlay.py` importable from `/opt/dsv41`, and
 `DSV41_COOP_MAINTENANCE_TEST=1`. Run GPU validation only with sufficient free
 memory in an approved maintenance window, not alongside active user workloads.
+Run the GPU gate without `-O`; it refuses optimized Python rather than silently
+skipping numerical assertions. The 72 cases include oversized rows 9/12/18/24.
+The original 0.3% peak screen is retained; row-peak and relative-L2 diagnostics
+must also stay below 5%. These synthetic checks are not a model-quality proof.
 
 ## Attribution
+
+Runtime hardening and capture-aware diagnostics adapt
+[GLM-5.3-Flash PR #202](https://github.com/MiaAI-Lab/GLM-5.3-Flash-EXL3-2x-DGX-Sparks/pull/202).
+GLM's K4 MCG binary, 4096/1024 dimensions, top-k 8, and 32-row limit are **not**
+ported. DS4.1 retains its existing native source, ABI, binary pin, and shapes.
 
 The native implementation derives from Turboderp's
 [two-stage cooperative MoE kernel](https://github.com/turboderp-org/exllamav3/commit/58d4d7322a1b3bd70aae8412487b21cc5e205cf4).

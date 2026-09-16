@@ -9,7 +9,11 @@ from unittest.mock import patch
 
 
 def main():
-    fake_torch = NS(float16="fp16", bfloat16="bf16", float32="fp32", int64="i64")
+    capturing = {"on": False}
+    fake_torch = NS(
+        float16="fp16", bfloat16="bf16", float32="fp32", int64="i64",
+        cuda=NS(is_current_stream_capturing=lambda: capturing["on"]),
+    )
     name = "runtime.py"
     spec = importlib.util.spec_from_file_location(
         "cooperative_moe_runtime", Path(__file__).with_name(name)
@@ -23,6 +27,7 @@ def main():
     class Native:
         def __init__(self, device, root):
             self.device = device
+            self.occupancy = {2: (1, 1, 1), 3: (2, 2, 2)}
             native_creations.append(device)
 
         def __call__(self, *args):
@@ -203,6 +208,43 @@ def main():
         },
     ):
         assert adapter.install(fresh, enabled=True)
+    checks += 1
+    capturing["on"] = True
+    for rows in (1, 2, 3, 4, 6, 8, 12, 18, 24):
+        result = module.apply_exl3_fused_moe(
+            tensor((rows, 5120), "bf16"), tensor((rows, 6), "i64"),
+            tensor((rows, 6), "fp32"), obj, obj._exl3_inners, None, 10.0,
+        )
+        record = module._dsv41_coop_diag.capture_selection[rows]
+        assert record["selected"] == (rows <= 8)
+        assert record["kind"] == "capture"
+        assert result == ("candidate" if rows <= 8 else "stock")
+        checks += 1
+    capturing["on"] = False
+    assert module._dsv41_coop_diag.native_prepared
+    assert module._dsv41_coop_diag.ineligible_reasons["gate_bits_4"] == 1
+    assert module._dsv41_coop_diag.eager_selection[3072]["selected"] is False
+
+    # A failed native call must propagate, never fall back after a partial launch.
+    def failed_launch(*args):
+        raise RuntimeError("partial launch")
+
+    obj._dsv41_coop_native = NS(device="cuda:0")
+    class FailedNative:
+        device = "cuda:0"
+        __call__ = failed_launch
+    obj._dsv41_coop_native = FailedNative()
+    before = calls.count("stock")
+    try:
+        module.apply_exl3_fused_moe(
+            tensor((3, 5120), "bf16"), tensor((3, 6), "i64"),
+            tensor((3, 6), "fp32"), obj, obj._exl3_inners, None, 10.0,
+        )
+    except RuntimeError as exc:
+        assert str(exc) == "partial launch"
+    else:
+        raise AssertionError("failed native launch swallowed")
+    assert calls.count("stock") == before
     checks += 1
     print(
         {

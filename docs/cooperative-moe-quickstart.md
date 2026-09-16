@@ -226,13 +226,14 @@ image than the one just tested. Review/revalidate on recipe or image upgrades.
 ## 7. Verify activation, then send a short request
 
 Wait for the launcher to finish all warmups, not just the first HTTP health
-response. Check both nodes for the explicit activation message. The mounted and
-installed overlay digests must match the generated host file.
+response. Check both nodes for native preparation and a nonzero eligible-layer
+count with `native_prepared=True`, not just wrapper installation. The mounted
+and installed overlay digests must match the generated host file.
 
 ```bash
 sha256sum "$COOP_HEAD_STAGE/exl3-cooperative.py"
-docker logs "$COOP_HEAD_CONTAINER" 2>&1 | grep -F 'Fixed-shape cooperative MoE enabled'
-ssh -o BatchMode=yes "$COOP_WORKER" "docker logs '$COOP_WORKER_CONTAINER' 2>&1 | grep -F 'Fixed-shape cooperative MoE enabled'"
+docker logs "$COOP_HEAD_CONTAINER" 2>&1 | grep -E 'cooperative MoE (native prepared|prepared-layer summary)'
+ssh -o BatchMode=yes "$COOP_WORKER" "docker logs '$COOP_WORKER_CONTAINER' 2>&1 | grep -E 'cooperative MoE (native prepared|prepared-layer summary)'"
 docker exec "$COOP_HEAD_CONTAINER" sha256sum /opt/dsv41/exl3.py /usr/local/lib/python3.12/dist-packages/vllm/model_executor/layers/quantization/exl3.py
 ssh -o BatchMode=yes "$COOP_WORKER" "docker exec '$COOP_WORKER_CONTAINER' sha256sum /opt/dsv41/exl3.py /usr/local/lib/python3.12/dist-packages/vllm/model_executor/layers/quantization/exl3.py"
 curl --max-time 10 -fsS "http://127.0.0.1:$COOP_PORT/health"
@@ -248,9 +249,10 @@ curl --max-time 30 -fsS "${COOP_AUTH[@]}" \
 ```
 
 Use your configured `SERVED_MODEL_NAME` in the JSON if it differs from the
-default. Expect the final answer `323` and `finish_reason: stop`. The activation
-log establishes that the adapter was installed; the packaged GPU test above
-checks native selection and fallback, while a health response alone does not.
+default. Expect the final answer `323` and `finish_reason: stop`. Native preparation
+logs confirm the K2/K3 setup; eager/capture selection logs show which shapes
+select the kernel, not how often CUDA graphs replay. The packaged GPU test above
+checks numerical behavior and fallback; a health response alone does not.
 Only proceed to bounded C1/C2 tests if the gates and startup pass. Benchmark
 prompts, metric definitions and caveats are in [the report](cooperative-moe.md).
 
