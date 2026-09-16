@@ -338,6 +338,14 @@ index) into `dsv41-engram`. spark2 docker volumes:
 ./start.sh          # WEIGHT_SYNC=nfs is the default in .env
 ```
 
+Without a live exporter the recipe starts its own `dsv41-exl3-nfs`. It binds
+one real host directory (`NFS_EXPORT_ROOT`, default `CACHE_ROOT/nfs-export`)
+at `/export` holding hardlinks of both trees, because the kernel nfsd refuses
+to export the container's overlayfs `/export` root (the first activation on a
+stock overlay2 docker root failed with exactly that). Trees on another
+filesystem cannot be hardlinked; the recipe then falls back to the nested
+per-tree binds.
+
 **ZFS (optional, `WEIGHT_SYNC=zfs`).** Keeps a node-local replica on each Spark
 instead of serving the worker over the network, and updates it with
 `zfs send | recv` snapshot deltas rather than re-walking the tree.

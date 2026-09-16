@@ -19,6 +19,9 @@ NFS_EXPORT_MODEL="${NFS_EXPORT_MODEL:-dsv41-exl3}"
 NFS_EXPORT_ENGRAM="${NFS_EXPORT_ENGRAM:-dsv41-engram}"
 NFS_DOCKERFILE_DIR="${NFS_DOCKERFILE_DIR:-$SCRIPT_DIR/files/nfs-server}"
 HF_EXPORT_ROOT="${HF_EXPORT_ROOT:-$HOME/.cache/huggingface}"
+# Real host directory bound at /export when this recipe starts its own nfsd
+# (hardlink trees of MODEL_HOST and ENGRAM_SRC; must share their filesystem).
+NFS_EXPORT_ROOT="${NFS_EXPORT_ROOT:-$CACHE_ROOT/nfs-export}"
 NFS_OPTS_CLIENT="${NFS_OPTS_CLIENT:-nfsvers=4.2,ro,nconnect=8,rsize=1048576,wsize=1048576,hard,timeo=600}"
 NFS_SHARE="${NFS_SHARE:-1}"
 
@@ -114,11 +117,23 @@ nfs_ensure_server() {
     log "building NFS image $NFS_IMAGE"
     docker build -q -t "$NFS_IMAGE" "$NFS_DOCKERFILE_DIR" >/dev/null
     docker rm -f "$NFS_CONTAINER" >/dev/null 2>&1 || true
+    # The kernel nfsd cannot export the container's own overlayfs /export
+    # (fsid=0 on an overlay root fails exportfs, so the server never comes up
+    # on kits whose docker root is overlay2). Bind ONE real host directory at
+    # /export and publish both trees into it with hardlinks: same filesystem,
+    # zero extra bytes, and the export root is plain ext4/xfs. Trees on another
+    # filesystem cannot be hardlinked; those kits keep the nested per-tree binds.
+    local mounts=()
+    if nfs_publish_export_root "$NFS_EXPORT_ROOT"; then
+        mounts=(-v "$NFS_EXPORT_ROOT:/export:ro")
+    else
+        warn "cannot hardlink EXL3/Engram into $NFS_EXPORT_ROOT (different filesystem?); exporting nested per-tree binds"
+        mounts=(-v "$MODEL_HOST:/export/${NFS_EXPORT_MODEL}:ro" -v "$ENGRAM_SRC:/export/${NFS_EXPORT_ENGRAM}:ro")
+    fi
     log "exporting EXL3 + slim Engram via NFS (clients: $clients)"
     docker run -d --name "$NFS_CONTAINER" --restart unless-stopped \
         --privileged --network host \
-        -v "$MODEL_HOST:/export/${NFS_EXPORT_MODEL}:ro" \
-        -v "$ENGRAM_SRC:/export/${NFS_EXPORT_ENGRAM}:ro" \
+        "${mounts[@]}" \
         -e "NFS_CLIENTS=$clients" \
         "$NFS_IMAGE" >/dev/null
     local i
@@ -139,6 +154,34 @@ nfs_hardlink_tree() {
     local src="$1" dst="$2"
     mkdir -p "$dst"
     cp -a --link "$src"/. "$dst"/ 2>/dev/null || cp -al "$src"/. "$dst"/
+}
+
+# Publish MODEL_HOST and ENGRAM_SRC into one real export root (hardlinks).
+# Returns 1 with the half-built tree removed when a source cannot be linked
+# (EXDEV: different filesystem). Existing complete trees are kept as they are.
+nfs_publish_export_root() {
+    local root="$1" model_dst engram_dst n
+    model_dst="$root/$NFS_EXPORT_MODEL"
+    engram_dst="$root/$NFS_EXPORT_ENGRAM"
+    mkdir -p "$root" || return 1
+    n=$(find "$model_dst" -maxdepth 1 -name 'model-*-of-*.safetensors' 2>/dev/null | wc -l | tr -d ' ')
+    if [ "${n:-0}" -lt "$EXPECTED_SHARDS" ] || [ ! -f "$model_dst/config.json" ]; then
+        rm -rf "$model_dst"
+        if ! nfs_hardlink_tree "$MODEL_HOST" "$model_dst" 2>/dev/null; then
+            rm -rf "$model_dst"
+            return 1
+        fi
+    fi
+    if [ ! -f "$engram_dst/model-00047-of-00048.safetensors" ] \
+       || [ ! -f "$engram_dst/model-00048-of-00048.safetensors" ] \
+       || [ ! -f "$engram_dst/model.safetensors.index.json" ]; then
+        rm -rf "$engram_dst"
+        if ! nfs_hardlink_tree "$ENGRAM_SRC" "$engram_dst" 2>/dev/null; then
+            rm -rf "$engram_dst"
+            return 1
+        fi
+    fi
+    return 0
 }
 
 nfs_publish() {
