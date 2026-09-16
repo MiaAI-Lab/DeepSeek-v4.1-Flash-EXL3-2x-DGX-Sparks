@@ -114,7 +114,15 @@ MemAvailable was 5.18 GiB on the head and 5.65 GiB on the worker; no stream or
 memory-monitor errors, preemptions, or OOM kills were observed. The existing
 nonfatal p-only sampler-cache coverage warning remains.
 
-## Current package validation and remaining work
+## Runtime hardening revalidation
+
+The [GLM PR #202 adaptation report](cooperative-moe-runtime-hardening.md) records
+the later runtime-only safety port, normal/optimized-Python checks, 72-case GPU
+gates on **both** Sparks, and same-day serving measurements. It preserves DS4.1's
+native kernel and does not claim an additional speedup. In particular, the
+old/new adapter prose ×1 timing difference remains unisolated.
+
+## Original package validation and remaining work
 
 The public naming/layout cleanup preserves native source byte-for-byte and keeps
 the validated ABI v1 symbols and binary digest. Python dispatch state, artifact

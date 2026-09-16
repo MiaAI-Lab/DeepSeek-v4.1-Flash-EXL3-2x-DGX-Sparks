@@ -1,0 +1,736 @@
+{
+  "description": "GLM PR #202 validation and DS4.1 runtime-only safety port; no native kernel changes or new DS speedup claim.",
+  "date": "2026-09-16",
+  "glm": {
+    "commit": "f4a505c",
+    "binary_sha256": "dfccdea3ddc961b211aad27dfceb8f34dc9cbd7e264dd2d94d2f304580c3c919",
+    "image": "ghcr.io/miaai-lab/glm-5.3-flash-2x-dgx-sparks:exl3-instanttensor",
+    "config": {
+      "dflash_k": 3,
+      "draft_sampling": "probabilistic",
+      "adaptive_k": "off",
+      "dense_fp8": "off",
+      "max_model_len": 850000,
+      "max_num_batched_tokens": 7168,
+      "gpu_memory_utilization": 0.88,
+      "geometry": 1
+    },
+    "gpu_head": {
+      "stage": "complete",
+      "checks": 48,
+      "status": "pass",
+      "capture_rows": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        8,
+        9,
+        10,
+        12,
+        15,
+        16,
+        20,
+        24,
+        32
+      ],
+      "strict_raw_failed_elements_retained": 4071486,
+      "strict_post_bf16_failed_elements_retained": 2610819,
+      "clip_or_mut_peak_violations": 2,
+      "max_rel_l2": 0.002668948145583272,
+      "violations": [
+        {
+          "kind": "peak",
+          "label": "eager-mut-vs-stock rows=10 scale=0.6",
+          "peak_rel": 0.003605777397751808,
+          "rel_l2": 0.001697808620519936,
+          "row_rel_max": 0.003942453768104315,
+          "row_rel_mean": 0.0018835570546798408
+        },
+        {
+          "kind": "peak",
+          "label": "eager-vs-stock rows=8 conc=True limit=0.5",
+          "peak_rel": 0.0032524552661925554,
+          "rel_l2": 0.002668948145583272,
+          "row_rel_max": 0.003988288342952728,
+          "row_rel_mean": 0.002693535789148882
+        }
+      ],
+      "numerical_screen": "peak<=0.003 of reference peak on eager stock compares; rel_l2<=0.05; per-row peak<=0.05; graph must match eager cooperative; strict differences retained",
+      "distributed_serving_verified": false,
+      "quality_eval_verified": false
+    },
+    "gpu_worker": {
+      "stage": "complete",
+      "checks": 48,
+      "status": "pass",
+      "capture_rows": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        8,
+        9,
+        10,
+        12,
+        15,
+        16,
+        20,
+        24,
+        32
+      ],
+      "strict_raw_failed_elements_retained": 4071482,
+      "strict_post_bf16_failed_elements_retained": 2610826,
+      "clip_or_mut_peak_violations": 2,
+      "max_rel_l2": 0.0026689476799219847,
+      "violations": [
+        {
+          "kind": "peak",
+          "label": "eager-mut-vs-stock rows=10 scale=0.6",
+          "peak_rel": 0.003605776932090521,
+          "rel_l2": 0.001697808620519936,
+          "row_rel_max": 0.003942453768104315,
+          "row_rel_mean": 0.0018835696275345982
+        },
+        {
+          "kind": "peak",
+          "label": "eager-vs-stock rows=8 conc=True limit=0.5",
+          "peak_rel": 0.003252472495660186,
+          "rel_l2": 0.0026689476799219847,
+          "row_rel_max": 0.003988309763371944,
+          "row_rel_mean": 0.002693551534321159
+        }
+      ],
+      "numerical_screen": "peak<=0.003 of reference peak on eager stock compares; rel_l2<=0.05; per-row peak<=0.05; graph must match eager cooperative; strict differences retained",
+      "distributed_serving_verified": false,
+      "quality_eval_verified": false
+    },
+    "benchmarks": {
+      "stock-k3-prose-c1-seq": {
+        "tok_s_median": 28.707498304478303,
+        "aggregate_tok_s_median": null,
+        "accept_ratio_median": 0.6033,
+        "health_code_after": 200,
+        "runs": [
+          {
+            "tok_s": 28.95815804297239,
+            "ttft_s": 0.2583006666973233,
+            "aggregate_tok_s": null,
+            "completion_tokens": 400,
+            "spec": {
+              "drafts": 138,
+              "draft_tokens": 414,
+              "accepted": 261,
+              "accept_ratio": 0.6304,
+              "accepted_per_step": 1.891,
+              "mean_draft_tokens_per_step": 3.0,
+              "pos": [
+                0.8188,
+                0.6304,
+                0.442,
+                0.0,
+                0.0,
+                0.0,
+                0.0
+              ]
+            }
+          },
+          {
+            "tok_s": 28.707498304478303,
+            "ttft_s": 0.3262561559677124,
+            "aggregate_tok_s": null,
+            "completion_tokens": 400,
+            "spec": {
+              "drafts": 142,
+              "draft_tokens": 426,
+              "accepted": 257,
+              "accept_ratio": 0.6033,
+              "accepted_per_step": 1.81,
+              "mean_draft_tokens_per_step": 3.0,
+              "pos": [
+                0.8099,
+                0.5845,
+                0.4155,
+                0.0,
+                0.0,
+                0.0,
+                0.0
+              ]
+            }
+          },
+          {
+            "tok_s": 27.712358307296093,
+            "ttft_s": 0.32342358212918043,
+            "aggregate_tok_s": null,
+            "completion_tokens": 400,
+            "spec": {
+              "drafts": 147,
+              "draft_tokens": 441,
+              "accepted": 253,
+              "accept_ratio": 0.5737,
+              "accepted_per_step": 1.721,
+              "mean_draft_tokens_per_step": 3.0,
+              "pos": [
+                0.8095,
+                0.5374,
+                0.3741,
+                0.0,
+                0.0,
+                0.0,
+                0.0
+              ]
+            }
+          }
+        ]
+      },
+      "stock-k3-prose-c2": {
+        "tok_s_median": 27.43706090293574,
+        "aggregate_tok_s_median": 27.066380325186294,
+        "accept_ratio_median": 0.5687,
+        "health_code_after": 200,
+        "runs": [
+          {
+            "tok_s": 22.31844956310425,
+            "ttft_s": 0.42007529200054705,
+            "aggregate_tok_s": 42.751597361029305,
+            "completion_tokens": 800,
+            "spec": {
+              "drafts": 296,
+              "draft_tokens": 888,
+              "accepted": 505,
+              "accept_ratio": 0.5687,
+              "accepted_per_step": 1.706,
+              "mean_draft_tokens_per_step": 3.0,
+              "pos": [
+                0.75,
+                0.5541,
+                0.402,
+                0.0,
+                0.0,
+                0.0,
+                0.0
+              ]
+            }
+          },
+          {
+            "tok_s": 27.43706090293574,
+            "ttft_s": 7.941405885620043,
+            "aggregate_tok_s": 26.798567017017835,
+            "completion_tokens": 800,
+            "spec": {
+              "drafts": 296,
+              "draft_tokens": 888,
+              "accepted": 503,
+              "accept_ratio": 0.5664,
+              "accepted_per_step": 1.699,
+              "mean_draft_tokens_per_step": 3.0,
+              "pos": [
+                0.7736,
+                0.5473,
+                0.3784,
+                0.0,
+                0.0,
+                0.0,
+                0.0
+              ]
+            }
+          },
+          {
+            "tok_s": 27.544146578415372,
+            "ttft_s": 7.5809009179938585,
+            "aggregate_tok_s": 27.066380325186294,
+            "completion_tokens": 800,
+            "spec": {
+              "drafts": 293,
+              "draft_tokens": 879,
+              "accepted": 505,
+              "accept_ratio": 0.5745,
+              "accepted_per_step": 1.724,
+              "mean_draft_tokens_per_step": 3.0,
+              "pos": [
+                0.7952,
+                0.5461,
+                0.3823,
+                0.0,
+                0.0,
+                0.0,
+                0.0
+              ]
+            }
+          }
+        ]
+      },
+      "stock-k3-structured-c1-seq": {
+        "tok_s_median": 40.33151530014529,
+        "aggregate_tok_s_median": null,
+        "accept_ratio_median": 1.0,
+        "health_code_after": 200,
+        "runs": [
+          {
+            "tok_s": 40.24522759307869,
+            "ttft_s": 0.3275819160044193,
+            "aggregate_tok_s": null,
+            "completion_tokens": 200,
+            "spec": {
+              "drafts": 50,
+              "draft_tokens": 150,
+              "accepted": 150,
+              "accept_ratio": 1.0,
+              "accepted_per_step": 3.0,
+              "mean_draft_tokens_per_step": 3.0,
+              "pos": [
+                1.0,
+                1.0,
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0
+              ]
+            }
+          },
+          {
+            "tok_s": 40.345832514221094,
+            "ttft_s": 0.31020193407312036,
+            "aggregate_tok_s": null,
+            "completion_tokens": 200,
+            "spec": {
+              "drafts": 50,
+              "draft_tokens": 150,
+              "accepted": 150,
+              "accept_ratio": 1.0,
+              "accepted_per_step": 3.0,
+              "mean_draft_tokens_per_step": 3.0,
+              "pos": [
+                1.0,
+                1.0,
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0
+              ]
+            }
+          },
+          {
+            "tok_s": 40.33151530014529,
+            "ttft_s": 0.32932135462760925,
+            "aggregate_tok_s": null,
+            "completion_tokens": 200,
+            "spec": {
+              "drafts": 50,
+              "draft_tokens": 150,
+              "accepted": 150,
+              "accept_ratio": 1.0,
+              "accepted_per_step": 3.0,
+              "mean_draft_tokens_per_step": 3.0,
+              "pos": [
+                1.0,
+                1.0,
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0
+              ]
+            }
+          }
+        ]
+      },
+      "coop-k3-prose-c1": {
+        "tok_s_median": 32.18579347602172,
+        "aggregate_tok_s_median": null,
+        "accept_ratio_median": 0.6329,
+        "health_code_after": 200,
+        "runs": [
+          {
+            "tok_s": 31.644169874321317,
+            "ttft_s": 0.3047331268899143,
+            "aggregate_tok_s": null,
+            "completion_tokens": 400,
+            "spec": {
+              "drafts": 141,
+              "draft_tokens": 423,
+              "accepted": 258,
+              "accept_ratio": 0.6099,
+              "accepted_per_step": 1.83,
+              "mean_draft_tokens_per_step": 3.0,
+              "pos": [
+                0.8085,
+                0.5745,
+                0.4468,
+                0.0,
+                0.0,
+                0.0,
+                0.0
+              ]
+            }
+          },
+          {
+            "tok_s": 32.48699076456354,
+            "ttft_s": 0.3199075940065086,
+            "aggregate_tok_s": null,
+            "completion_tokens": 400,
+            "spec": {
+              "drafts": 137,
+              "draft_tokens": 411,
+              "accepted": 265,
+              "accept_ratio": 0.6448,
+              "accepted_per_step": 1.934,
+              "mean_draft_tokens_per_step": 3.0,
+              "pos": [
+                0.854,
+                0.6496,
+                0.4307,
+                0.0,
+                0.0,
+                0.0,
+                0.0
+              ]
+            }
+          },
+          {
+            "tok_s": 32.18579347602172,
+            "ttft_s": 0.24762036511674523,
+            "aggregate_tok_s": null,
+            "completion_tokens": 400,
+            "spec": {
+              "drafts": 138,
+              "draft_tokens": 414,
+              "accepted": 262,
+              "accept_ratio": 0.6329,
+              "accepted_per_step": 1.899,
+              "mean_draft_tokens_per_step": 3.0,
+              "pos": [
+                0.7971,
+                0.6304,
+                0.471,
+                0.0,
+                0.0,
+                0.0,
+                0.0
+              ]
+            }
+          }
+        ]
+      },
+      "coop-k3-prose-c2": {
+        "tok_s_median": 24.971624189399307,
+        "aggregate_tok_s_median": 47.160979198241826,
+        "accept_ratio_median": 0.5908,
+        "health_code_after": 200,
+        "runs": [
+          {
+            "tok_s": 24.971624189399307,
+            "ttft_s": 0.33827325655147433,
+            "aggregate_tok_s": 48.47818483252249,
+            "completion_tokens": 800,
+            "spec": {
+              "drafts": 290,
+              "draft_tokens": 870,
+              "accepted": 514,
+              "accept_ratio": 0.5908,
+              "accepted_per_step": 1.772,
+              "mean_draft_tokens_per_step": 3.0,
+              "pos": [
+                0.7966,
+                0.5759,
+                0.4,
+                0.0,
+                0.0,
+                0.0,
+                0.0
+              ]
+            }
+          },
+          {
+            "tok_s": 31.197314619398323,
+            "ttft_s": 6.694193996023387,
+            "aggregate_tok_s": 30.570099807961736,
+            "completion_tokens": 800,
+            "spec": {
+              "drafts": 285,
+              "draft_tokens": 855,
+              "accepted": 516,
+              "accept_ratio": 0.6035,
+              "accepted_per_step": 1.811,
+              "mean_draft_tokens_per_step": 3.0,
+              "pos": [
+                0.7895,
+                0.5965,
+                0.4246,
+                0.0,
+                0.0,
+                0.0,
+                0.0
+              ]
+            }
+          },
+          {
+            "tok_s": 24.179575710586306,
+            "ttft_s": 0.35054359724745154,
+            "aggregate_tok_s": 47.160979198241826,
+            "completion_tokens": 800,
+            "spec": {
+              "drafts": 292,
+              "draft_tokens": 876,
+              "accepted": 509,
+              "accept_ratio": 0.5811,
+              "accepted_per_step": 1.743,
+              "mean_draft_tokens_per_step": 3.0,
+              "pos": [
+                0.7637,
+                0.5616,
+                0.4178,
+                0.0,
+                0.0,
+                0.0,
+                0.0
+              ]
+            }
+          }
+        ]
+      },
+      "coop-k3-structured-c1": {
+        "tok_s_median": 43.96135965760434,
+        "aggregate_tok_s_median": null,
+        "accept_ratio_median": 1.0,
+        "health_code_after": 200,
+        "runs": [
+          {
+            "tok_s": 43.96135965760434,
+            "ttft_s": 0.2978513422422111,
+            "aggregate_tok_s": null,
+            "completion_tokens": 200,
+            "spec": {
+              "drafts": 50,
+              "draft_tokens": 150,
+              "accepted": 150,
+              "accept_ratio": 1.0,
+              "accepted_per_step": 3.0,
+              "mean_draft_tokens_per_step": 3.0,
+              "pos": [
+                1.0,
+                1.0,
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0
+              ]
+            }
+          },
+          {
+            "tok_s": 44.17435303629809,
+            "ttft_s": 0.2866410808637738,
+            "aggregate_tok_s": null,
+            "completion_tokens": 200,
+            "spec": {
+              "drafts": 50,
+              "draft_tokens": 150,
+              "accepted": 150,
+              "accept_ratio": 1.0,
+              "accepted_per_step": 3.0,
+              "mean_draft_tokens_per_step": 3.0,
+              "pos": [
+                1.0,
+                1.0,
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0
+              ]
+            }
+          },
+          {
+            "tok_s": 43.92218538150508,
+            "ttft_s": 0.2926797950640321,
+            "aggregate_tok_s": null,
+            "completion_tokens": 200,
+            "spec": {
+              "drafts": 50,
+              "draft_tokens": 150,
+              "accepted": 150,
+              "accept_ratio": 1.0,
+              "accepted_per_step": 3.0,
+              "mean_draft_tokens_per_step": 3.0,
+              "pos": [
+                1.0,
+                1.0,
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0
+              ]
+            }
+          }
+        ]
+      }
+    }
+  },
+  "deepseek": {
+    "binary_sha256": "cf6ff1e2ef775a2a17ddafb62ce5f31c6a1840c9938d2be07ae688dd494246ed",
+    "adapter_source_sha256": "a5e953e39d3f933d8f7dd0105e80b721ffe551ddc68e2e992df9b6cf510dc559",
+    "config": {
+      "dspark_k": 3,
+      "max_model_len": 600000,
+      "max_num_seqs": 2,
+      "max_num_batched_tokens": 1536,
+      "io_threads": 96,
+      "packed_engram": true,
+      "geometry": 1
+    },
+    "gpu_head": {
+      "stage": "complete",
+      "checks": 72,
+      "status": "pass",
+      "strict_raw_failed_elements_retained": 6124449,
+      "strict_post_bf16_failed_elements_retained": 3912210,
+      "max_peak_rel": 0.002660412574186921,
+      "max_row_peak_rel": 0.002691508736461401,
+      "max_rel_l2": 0.0017953452188521624,
+      "numerical_screen": "peak<=0.003; row peak<=0.05; rel L2<=0.05; strict differences retained",
+      "distributed_serving_verified": false
+    },
+    "gpu_worker": {
+      "stage": "complete",
+      "checks": 72,
+      "status": "pass",
+      "strict_raw_failed_elements_retained": 6124452,
+      "strict_post_bf16_failed_elements_retained": 3912213,
+      "max_peak_rel": 0.002660526894032955,
+      "max_row_peak_rel": 0.0026915189810097218,
+      "max_rel_l2": 0.0017953446367755532,
+      "numerical_screen": "peak<=0.003; row peak<=0.05; rel L2<=0.05; strict differences retained",
+      "distributed_serving_verified": false
+    },
+    "sparkdash": {
+      "before": [
+        [
+          {
+            "concurrency": 1,
+            "aggregateDecodeTps": 40.18,
+            "medianDecodeTps": 40.18,
+            "meanTtftMs": 226.39,
+            "totalCompletionTokens": 400,
+            "streamsFailed": 0
+          },
+          {
+            "concurrency": 2,
+            "aggregateDecodeTps": 62.87,
+            "medianDecodeTps": 31.53,
+            "meanTtftMs": 344.06,
+            "totalCompletionTokens": 800,
+            "streamsFailed": 0
+          }
+        ],
+        [
+          {
+            "concurrency": 1,
+            "aggregateDecodeTps": 40.54,
+            "medianDecodeTps": 40.54,
+            "meanTtftMs": 220.83,
+            "totalCompletionTokens": 400,
+            "streamsFailed": 0
+          },
+          {
+            "concurrency": 2,
+            "aggregateDecodeTps": 57.23,
+            "medianDecodeTps": 30.03,
+            "meanTtftMs": 340.2,
+            "totalCompletionTokens": 800,
+            "streamsFailed": 0
+          }
+        ],
+        [
+          {
+            "concurrency": 1,
+            "aggregateDecodeTps": 40.69,
+            "medianDecodeTps": 40.69,
+            "meanTtftMs": 235.44,
+            "totalCompletionTokens": 400,
+            "streamsFailed": 0
+          },
+          {
+            "concurrency": 2,
+            "aggregateDecodeTps": 61.37,
+            "medianDecodeTps": 30.76,
+            "meanTtftMs": 336.61,
+            "totalCompletionTokens": 800,
+            "streamsFailed": 0
+          }
+        ]
+      ],
+      "after": [
+        [
+          {
+            "concurrency": 1,
+            "aggregateDecodeTps": 40.45,
+            "medianDecodeTps": 40.45,
+            "meanTtftMs": 222.15,
+            "totalCompletionTokens": 400,
+            "streamsFailed": 0
+          },
+          {
+            "concurrency": 2,
+            "aggregateDecodeTps": 61.67,
+            "medianDecodeTps": 31.36,
+            "meanTtftMs": 353.04,
+            "totalCompletionTokens": 800,
+            "streamsFailed": 0
+          }
+        ],
+        [
+          {
+            "concurrency": 1,
+            "aggregateDecodeTps": 31.17,
+            "medianDecodeTps": 31.17,
+            "meanTtftMs": 273.96,
+            "totalCompletionTokens": 400,
+            "streamsFailed": 0
+          },
+          {
+            "concurrency": 2,
+            "aggregateDecodeTps": 63.75,
+            "medianDecodeTps": 31.95,
+            "meanTtftMs": 353.39,
+            "totalCompletionTokens": 800,
+            "streamsFailed": 0
+          }
+        ],
+        [
+          {
+            "concurrency": 1,
+            "aggregateDecodeTps": 36.05,
+            "medianDecodeTps": 36.05,
+            "meanTtftMs": 221.66,
+            "totalCompletionTokens": 400,
+            "streamsFailed": 0
+          },
+          {
+            "concurrency": 2,
+            "aggregateDecodeTps": 62.03,
+            "medianDecodeTps": 32.02,
+            "meanTtftMs": 455.85,
+            "totalCompletionTokens": 800,
+            "streamsFailed": 0
+          }
+        ]
+      ]
+    }
+  },
+  "caveats": [
+    "GLM initial overlapping benchmark attempts excluded; only isolated *-seq single-stream runs retained.",
+    "GLM concurrency-2 requests sometimes serialized; aggregate medians are not evidence of a kernel scaling gain.",
+    "GLM packaged gate permits two clipping/mutation peak exceptions; both are preserved in the GPU records.",
+    "DS old/new prose C1 medians 40.54/36.05 tok/s, C2 61.37/62.03; variable speculative acceptance and no matched output proof. No performance non-regression claim.",
+    "Both binaries are locally rebuilt/repinned test artifacts; release binary pins unchanged.",
+    "No 600k prompt test, sanitizers, real-weight activation comparison, or prolonged quality/burn-in evaluation in this port."
+  ]
+}
