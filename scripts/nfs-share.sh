@@ -78,7 +78,7 @@ nfs_rpc_ready() {
 nfs_write_exports() {
     local ctn="$1" clients="$2"
     docker exec -e NFS_CLIENTS="$clients" \
-        -e NFS_OPTS="${NFS_OPTS:-ro,sync,no_subtree_check,no_root_squash,insecure,fsid=0}" \
+        -e NFS_OPTS="${NFS_OPTS:-ro,sync,no_subtree_check,no_root_squash,insecure,crossmnt,fsid=0}" \
         "$ctn" bash -lc '
       set -e
       {
@@ -116,10 +116,10 @@ nfs_ensure_server() {
     docker rm -f "$NFS_CONTAINER" >/dev/null 2>&1 || true
     log "exporting EXL3 + slim Engram via NFS (clients: $clients)"
     docker run -d --name "$NFS_CONTAINER" --restart unless-stopped \
-        --privileged --network host \
+        --privileged --network host --tmpfs /export \
         -v "$MODEL_HOST:/export/${NFS_EXPORT_MODEL}:ro" \
         -v "$ENGRAM_SRC:/export/${NFS_EXPORT_ENGRAM}:ro" \
-        -e "NFS_CLIENTS=$clients" \
+        -e "NFS_CLIENTS=$clients" -e NFS_OPTS=ro,sync,no_subtree_check,no_root_squash,insecure,crossmnt,fsid=0 \
         "$NFS_IMAGE" >/dev/null
     local i
     for i in $(seq 1 20); do
