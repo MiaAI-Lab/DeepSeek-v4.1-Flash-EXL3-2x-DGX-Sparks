@@ -32,6 +32,11 @@ hf_cli() {
     fi
 }
 
+# A fresh checkout has no $MODEL_HOST yet, and `find` on a missing directory exits
+# 1. Under `set -euo pipefail` that status propagates out of the pipeline and the
+# command substitution, so the script dies here -- before its first echo, with no
+# output at all. Create the directory first; the download below writes into it.
+mkdir -p "$MODEL_HOST"
 have=$(find "$MODEL_HOST" -maxdepth 1 -name 'model-*.safetensors' 2>/dev/null | wc -l | tr -d '[:space:]')
 echo "EXL3    $MODEL_HOST  ${have:-0}/$EXPECTED_SHARDS shards"
 if [ "${have:-0}" -lt "$EXPECTED_SHARDS" ] || [ ! -f "$MODEL_HOST/config.json" ]; then
