@@ -41,6 +41,7 @@ if [ "${have:-0}" -lt "$EXPECTED_SHARDS" ] || [ ! -f "$MODEL_HOST/config.json" ]
 fi
 
 ENGRAM_FILES=(
+    "config.json"
     "model-00047-of-00048.safetensors"
     "model-00048-of-00048.safetensors"
     "model.safetensors.index.json"
