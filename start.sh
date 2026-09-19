@@ -70,6 +70,8 @@ _cli_max_num_seqs="${MAX_NUM_SEQS-}"
 _cli_max_model_len="${MAX_MODEL_LEN-}"
 _cli_spinwait_ms_set="${GLM53_SPINWAIT_MS+1}"
 _cli_spinwait_ms="${GLM53_SPINWAIT_MS-}"
+_cli_moex_set="${DSV41_EXL3_MOE_X+1}"
+_cli_moex="${DSV41_EXL3_MOE_X-}"
 _cli_dspark="${DSPARK_TOKENS-}"
 set -a
 # shellcheck disable=SC1091
@@ -91,6 +93,7 @@ set +a
 [ -n "${_cli_max_num_seqs}" ] && MAX_NUM_SEQS="$_cli_max_num_seqs"
 [ -n "${_cli_max_model_len}" ] && MAX_MODEL_LEN="$_cli_max_model_len"
 [ -n "${_cli_spinwait_ms_set}" ] && GLM53_SPINWAIT_MS="$_cli_spinwait_ms"
+[ -n "${_cli_moex_set}" ] && DSV41_EXL3_MOE_X="$_cli_moex"
 [ -n "${_cli_dspark}" ] && DSPARK_TOKENS="$_cli_dspark"
 
 # ----------------------------- configuration -------------------------------
