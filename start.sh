@@ -423,6 +423,7 @@ hf_fetch() {
 # Engram needs only shards 47+48 of the 48-shard original (~95 GiB each) plus
 # the index; the other 46 are never read. Do not pull the whole 476 GiB repo.
 ENGRAM_FILES=(
+    "config.json"
     "model-00047-of-00048.safetensors"
     "model-00048-of-00048.safetensors"
     "model.safetensors.index.json"

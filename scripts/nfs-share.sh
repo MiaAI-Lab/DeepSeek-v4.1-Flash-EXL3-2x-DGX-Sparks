@@ -78,7 +78,7 @@ nfs_rpc_ready() {
 nfs_write_exports() {
     local ctn="$1" clients="$2"
     docker exec -e NFS_CLIENTS="$clients" \
-        -e NFS_OPTS="${NFS_OPTS:-ro,sync,no_subtree_check,no_root_squash,insecure,fsid=0}" \
+        -e NFS_OPTS="${NFS_OPTS:-ro,sync,no_subtree_check,no_root_squash,insecure,fsid=0,crossmnt}" \
         "$ctn" bash -lc '
       set -e
       {
@@ -115,8 +115,13 @@ nfs_ensure_server() {
     docker build -q -t "$NFS_IMAGE" "$NFS_DOCKERFILE_DIR" >/dev/null
     docker rm -f "$NFS_CONTAINER" >/dev/null 2>&1 || true
     log "exporting EXL3 + slim Engram via NFS (clients: $clients)"
+    # Kernel NFS cannot export the container overlay filesystem.
+    local export_root="$CACHE_ROOT/nfs-root"
+    mkdir -p "$export_root/$NFS_EXPORT_MODEL" "$export_root/$NFS_EXPORT_ENGRAM"
     docker run -d --name "$NFS_CONTAINER" --restart unless-stopped \
         --privileged --network host \
+        -v "$export_root:/export:ro" \
+        -e "NFS_OPTS=${NFS_OPTS:-ro,sync,no_subtree_check,no_root_squash,insecure,fsid=0,crossmnt}" \
         -v "$MODEL_HOST:/export/${NFS_EXPORT_MODEL}:ro" \
         -v "$ENGRAM_SRC:/export/${NFS_EXPORT_ENGRAM}:ro" \
         -e "NFS_CLIENTS=$clients" \
