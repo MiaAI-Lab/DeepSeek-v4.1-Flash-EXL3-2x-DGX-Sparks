@@ -70,6 +70,8 @@ _cli_max_num_seqs="${MAX_NUM_SEQS-}"
 _cli_max_model_len="${MAX_MODEL_LEN-}"
 _cli_spinwait_ms_set="${GLM53_SPINWAIT_MS+1}"
 _cli_spinwait_ms="${GLM53_SPINWAIT_MS-}"
+_cli_moex_set="${DSV41_EXL3_MOE_X+1}"
+_cli_moex="${DSV41_EXL3_MOE_X-}"
 _cli_dspark="${DSPARK_TOKENS-}"
 set -a
 # shellcheck disable=SC1091
@@ -91,6 +93,7 @@ set +a
 [ -n "${_cli_max_num_seqs}" ] && MAX_NUM_SEQS="$_cli_max_num_seqs"
 [ -n "${_cli_max_model_len}" ] && MAX_MODEL_LEN="$_cli_max_model_len"
 [ -n "${_cli_spinwait_ms_set}" ] && GLM53_SPINWAIT_MS="$_cli_spinwait_ms"
+[ -n "${_cli_moex_set}" ] && DSV41_EXL3_MOE_X="$_cli_moex"
 [ -n "${_cli_dspark}" ] && DSPARK_TOKENS="$_cli_dspark"
 
 # ----------------------------- configuration -------------------------------
@@ -1418,7 +1421,7 @@ launch_cluster() {
              LIMIT_MM CHAT_TEMPLATE ENFORCE_EAGER EXL3_FUSED_MOE EXL3_MOE_ROW_TILE \
              EXL3_TEMP_ROWS_FUSED EXL3_FAT_SORTED EXL3_FAT_BATCHED EXL3_FAT_KERNEL \
              EXL3_FAT_GROUPED MODEL_DIR ENGRAM_MOUNT EXTRA_ARGS \
-             DSV41_CACHE_GIB DSV41_RESIDENT_SCALES DSV41_IO_THREADS \
+             DSV41_CACHE_GIB DSV41_RESIDENT_SCALES DSV41_IO_THREADS DSV41_EXL3_MOE_X \
              DSV41_CACHE_WAYS DSV41_STATS_SECONDS KV_CACHE_MEMORY_BYTES KV_BLOCK_SIZE \
              DSV41_SKIP_MIXED_WARMUP DSV41_DROP_PAGE_CACHE \
              DSV41_PREFILL_EMPTY_CACHE_MEMAVAIL_GIB DSV41_PREFILL_END_EMPTY_CACHE VLLM_SPARSE_INDEXER_MAX_LOGITS_MB \
@@ -1546,6 +1549,7 @@ launch_cluster() {
         -e ENGRAM_MOUNT="$ENGRAM_MOUNT" \
         -e DSV41_SOURCE="$ENGRAM_MOUNT" \
         -e DSV41_CACHE_GIB="$DSV41_CACHE_GIB" \
+        -e DSV41_EXL3_MOE_X="${DSV41_EXL3_MOE_X:-}" \
         -e DSV41_RESIDENT_SCALES="$DSV41_RESIDENT_SCALES" \
         -e DSV41_IO_THREADS="$DSV41_IO_THREADS" \
         -e DSV41_CACHE_WAYS="$DSV41_CACHE_WAYS" \
