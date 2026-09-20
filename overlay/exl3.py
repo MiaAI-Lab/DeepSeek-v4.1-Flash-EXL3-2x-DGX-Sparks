@@ -1537,8 +1537,21 @@ def moex_config() -> tuple[int, int, int]:
         if not raw:
             _MOEX["cfg"] = (-1, 0, 8)
         else:
-            parts = [int(p) for p in raw.split(",")]
-            _MOEX["cfg"] = (parts[0], parts[1] if len(parts) > 1 else 12, parts[2] if len(parts) > 2 else 8)
+            # Reject malformed settings here rather than at the first launch.
+            bad = ValueError(
+                f"DSV41_EXL3_MOE_X={raw!r} is malformed. Expected <shape>[,<groups>[,<group_size>]] "
+                "with positive integers, e.g. 2,12,8. Leave it unset or empty for exllamav3's "
+                "shipped exl3_moe."
+            )
+            parts = [p.strip() for p in raw.split(",")]
+            if not 1 <= len(parts) <= 3 or not all(p.lstrip("-").isdigit() for p in parts):
+                raise bad
+            shape, groups, gsize = (int(parts[0]),
+                                    int(parts[1]) if len(parts) > 1 else 12,
+                                    int(parts[2]) if len(parts) > 2 else 8)
+            if shape < 0 or groups <= 0 or gsize <= 0:
+                raise bad
+            _MOEX["cfg"] = (shape, groups, gsize)
     return _MOEX["cfg"]
 
 
@@ -1553,6 +1566,12 @@ def moex_module():
             import exl3_moe_x_ext
         _MOEX["mod"] = exl3_moe_x_ext
         shape, g, gs = moex_config()
+        if all(int(exl3_moe_x_ext.moex_variant_index(shape, k)) < 0 for k in (2, 3, 4)):
+            raise ValueError(
+                f"DSV41_EXL3_MOE_X shape {shape} has no compiled instance for K=2/3/4 in "
+                f"{getattr(exl3_moe_x_ext, '__file__', 'exl3_moe_x_ext')}. Valid shapes are "
+                f"0..{int(exl3_moe_x_ext.moex_num_variants()) - 1} as built; see overlay/moex/exl3_moe_x.cu."
+            )
         for k in (2, 3, 4):
             vi = int(exl3_moe_x_ext.moex_variant_index(shape, k))
             logger.info(

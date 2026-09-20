@@ -364,7 +364,7 @@ does not use), ~3 KB of trellis in flight per SM through a 3-stage cp.async ring
 the dominant stall in Nsight Compute. `overlay/moex/` builds the same kernel body with six
 cp.async stages, two fragment stages and two blocks per SM (`exl3_moe_x_ext`, compile-time
 K = 2/3/4 instances — a runtime-K switch spills its registers and loses the gain).
-`DSV41_EXL3_MOE_X=2,12,8` (the `.env.example` default) routes the fused launch through it:
+The kernel is opt-in: the shipped `exl3_moe` remains the default and `.env.example` carries `DSV41_EXL3_MOE_X=2,12,8` commented out. Uncomment it, or export it for one run, to route the fused launch through this kernel:
 
 | | shipped | `2,12,8` |
 |---|---:|---:|
@@ -376,10 +376,7 @@ K = 2/3/4 instances — a runtime-K switch spills its registers and loses the ga
 | WikiText-2 64×512 perplexity, paired | 6.305987 | 6.2994 (−0.10 % [−0.29, +0.08]) |
 
 Output is identical to the shipped kernel to 6e-8 at group size 8 (same split-K slice order).
-Prefill is unchanged: only experts with ≤ `EXL3_TEMP_ROWS_FUSED` rows take this path. Empty
-`DSV41_EXL3_MOE_X` restores the shipped kernel. Both containers must see the variable (it is in
-`serve_env` and in the head's explicit `-e` list). `overlay/moex/moe_bench.py` reproduces the
-standalone numbers from 48 extracted experts.
+Prefill is unchanged: only experts with ≤ `EXL3_TEMP_ROWS_FUSED` rows take this path. Unset or empty `DSV41_EXL3_MOE_X` restores the shipped kernel, and an empty value on the command line (`DSV41_EXL3_MOE_X= ./start.sh restart`) overrides the file, so a with/without A/B needs no edit. A malformed value is rejected at model load rather than silently ignored. Both containers must see the variable (it is in `serve_env` and in the head's explicit `-e` list). `overlay/moex/moe_bench.py` reproduces the standalone numbers from 48 extracted experts.
 
 ## Performance
 

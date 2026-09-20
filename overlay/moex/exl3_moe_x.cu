@@ -10,6 +10,15 @@
 
 struct MoexVariant { int tk, shs, frs, minb, bits, tn; void* kernel; int smem; const char* name; };
 
+// Every CUDA runtime call is checked: without a device (e.g. a build container with
+// --runtime=runc) these fail and leave their out-params untouched, so unchecked calls report
+// uninitialised stack as device properties instead of raising. Reported by @ezoushen in #6.
+#define MOEX_CUDA_CHECK(__call) \
+    do { \
+        cudaError_t __err = (__call); \
+        TORCH_CHECK(__err == cudaSuccess, "moex: ", #__call, " failed: ", cudaGetErrorString(__err)); \
+    } while (0)
+
 template<int TK, int SHS, int FRS, int MINB, int BITS, int TN>
 constexpr int moex_smem_bytes()
 {
@@ -56,15 +65,15 @@ std::vector<int64_t> moex_info(int variant)
     int block = 256 * v.tk / 16;
     if (!g_attr_set[variant])
     {
-        cudaFuncSetAttribute(v.kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, v.smem);
+        MOEX_CUDA_CHECK(cudaFuncSetAttribute(v.kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, v.smem));
         g_attr_set[variant] = true;
     }
-    cudaFuncAttributes attr;
-    cudaFuncGetAttributes(&attr, v.kernel);
+    cudaFuncAttributes attr = {};
+    MOEX_CUDA_CHECK(cudaFuncGetAttributes(&attr, v.kernel));
     int max_blocks = 0;
-    cudaOccupancyMaxActiveBlocksPerMultiprocessor(&max_blocks, v.kernel, block, v.smem);
-    int device; cudaGetDevice(&device);
-    int num_sms; cudaDeviceGetAttribute(&num_sms, cudaDevAttrMultiProcessorCount, device);
+    MOEX_CUDA_CHECK(cudaOccupancyMaxActiveBlocksPerMultiprocessor(&max_blocks, v.kernel, block, v.smem));
+    int device = -1; MOEX_CUDA_CHECK(cudaGetDevice(&device));
+    int num_sms = 0; MOEX_CUDA_CHECK(cudaDeviceGetAttribute(&num_sms, cudaDevAttrMultiProcessorCount, device));
     return { (int64_t) attr.numRegs, (int64_t) v.smem, (int64_t) max_blocks, (int64_t) block, (int64_t) num_sms, (int64_t) attr.localSizeBytes, (int64_t) attr.maxThreadsPerBlock };
 }
 
@@ -93,32 +102,75 @@ void exl3_moe_x
     const int variant = moex_variant_for(shape, K_gate);
     TORCH_CHECK(variant >= 0, "moex: no instance for shape ", shape, " K=", K_gate);
     MoexVariant& v = g_variants[variant];
-    TORCH_CHECK(gate_mul1 && up_mul1 && down_mul1 && !gate_mcg, "moex: mul1 codebook only");
+    // Argument validation mirrors exllamav3's exl3_moe entry point (same order, same macros), so a
+    // caller that is well-formed for the shipped kernel is well-formed here and vice versa.
     TORCH_CHECK_DTYPE(hidden_state, kHalf);
-    TORCH_CHECK_DTYPE(output_state, kFloat);
-    TORCH_CHECK_DTYPE(locks_buf, kInt);
-    TORCH_CHECK(locks_buf.numel() >= MOE_SCHED_OFFSET + MOE_SCHED_INTS, "locks buffer too small");
-    size_t hidden_dim = hidden_state.size(1);
-    size_t num_experts = expert_count.size(0) - 1;
+    TORCH_CHECK_DIM(hidden_state, 2);
     size_t bsz = hidden_state.size(0);
+    size_t hidden_dim = hidden_state.size(1);
+
+    TORCH_CHECK_DTYPE(output_state, kFloat);
+    TORCH_CHECK_SHAPES_FULL(output_state, hidden_state);
+
+    TORCH_CHECK_DTYPE(expert_count, kLong);
+    TORCH_CHECK_DIM(expert_count, 1);
+    size_t num_experts = expert_count.size(0) - 1;
+
+    TORCH_CHECK_DTYPE(token_sorted, kLong);
+    TORCH_CHECK_DIM(token_sorted, 1);
+    TORCH_CHECK_SHAPES_FULL(token_sorted, weight_sorted);
     size_t num_experts_per_tok = token_sorted.size(0) / bsz;
+
+    TORCH_CHECK_DTYPE(temp_state_g, kHalf);
+    TORCH_CHECK_DTYPE(temp_state_u, kHalf);
+    TORCH_CHECK_DIM(temp_state_g, 3);
+    TORCH_CHECK_SHAPES(temp_state_g, 2, hidden_state, 1, 1);
+    TORCH_CHECK_SHAPES_FULL(temp_state_g, temp_state_u);
     size_t max_tokens_per_expert = temp_state_g.size(1);
     size_t concurrency = temp_state_g.size(0);
+
+    TORCH_CHECK_DTYPE(temp_intermediate_g, kHalf);
+    TORCH_CHECK_DTYPE(temp_intermediate_u, kHalf);
+    TORCH_CHECK_DIM(temp_intermediate_g, 3);
+    TORCH_CHECK_DIM(temp_intermediate_u, 3);
+    TORCH_CHECK_SHAPES_FULL(temp_intermediate_g, temp_intermediate_u);
+    TORCH_CHECK_SHAPES(temp_intermediate_g, 1, temp_state_g, 1, 1);
     size_t intermediate_dim = temp_intermediate_g.size(2);
-    TORCH_CHECK(hidden_dim % 128 == 0 && intermediate_dim % 128 == 0, "dims must be multiples of 128");
-    TORCH_CHECK((int) concurrency >= num_groups, "temps hold fewer groups than launched");
-    TORCH_CHECK(num_groups <= MOE_MAX_GROUPS, "too many groups");
+
+    TORCH_CHECK(gate_mcg == up_mcg && up_mcg == down_mcg && gate_mul1 == up_mul1 && up_mul1 == down_mul1,
+                "moex: gate/up/down must share the same codebook");
+    TORCH_CHECK(gate_mcg != gate_mul1, "moex: only mcg and mul1 codebooks are supported");
+    TORCH_CHECK(gate_mul1, "moex: mul1 codebook only (build an mcg instance to serve mcg packs)");
+
+    TORCH_CHECK_DIM(gate_ptrs_trellis, 1);
+    TORCH_CHECK(gate_ptrs_trellis.size(0) == (int64_t) num_experts, "moex: gate tensor count != num_experts");
+    TORCH_CHECK_SHAPES_FULL(gate_ptrs_trellis, gate_ptrs_suh);
+    TORCH_CHECK_SHAPES_FULL(gate_ptrs_trellis, gate_ptrs_svh);
+    TORCH_CHECK_SHAPES_FULL(gate_ptrs_trellis, up_ptrs_trellis);
+    TORCH_CHECK_SHAPES_FULL(gate_ptrs_trellis, up_ptrs_suh);
+    TORCH_CHECK_SHAPES_FULL(gate_ptrs_trellis, up_ptrs_svh);
+    TORCH_CHECK_SHAPES_FULL(gate_ptrs_trellis, down_ptrs_trellis);
+    TORCH_CHECK_SHAPES_FULL(gate_ptrs_trellis, down_ptrs_suh);
+    TORCH_CHECK_SHAPES_FULL(gate_ptrs_trellis, down_ptrs_svh);
+
+    // moex-specific: the lock/scheduler buffer is caller-owned here, not DevCtx-owned.
+    TORCH_CHECK_DTYPE(locks_buf, kInt);
+    TORCH_CHECK(locks_buf.numel() >= MOE_SCHED_OFFSET + MOE_SCHED_INTS, "moex: locks buffer too small");
+    TORCH_CHECK(hidden_dim % 128 == 0 && intermediate_dim % 128 == 0, "moex: dims must be multiples of 128");
+    TORCH_CHECK((int) concurrency >= num_groups, "moex: temps hold fewer groups than launched");
+    TORCH_CHECK(num_groups > 0 && num_groups <= MOE_MAX_GROUPS, "moex: num_groups out of range");
+    TORCH_CHECK(group_size > 0, "moex: group_size must be positive");
 
     int block = 256 * v.tk / 16;
     if (!g_attr_set[variant])
     {
-        cudaFuncSetAttribute(v.kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, v.smem);
+        MOEX_CUDA_CHECK(cudaFuncSetAttribute(v.kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, v.smem));
         g_attr_set[variant] = true;
     }
     int max_blocks = 0;
-    cudaOccupancyMaxActiveBlocksPerMultiprocessor(&max_blocks, v.kernel, block, v.smem);
-    int device; cudaGetDevice(&device);
-    int num_sms; cudaDeviceGetAttribute(&num_sms, cudaDevAttrMultiProcessorCount, device);
+    MOEX_CUDA_CHECK(cudaOccupancyMaxActiveBlocksPerMultiprocessor(&max_blocks, v.kernel, block, v.smem));
+    int device = -1; MOEX_CUDA_CHECK(cudaGetDevice(&device));
+    int num_sms = 0; MOEX_CUDA_CHECK(cudaDeviceGetAttribute(&num_sms, cudaDevAttrMultiProcessorCount, device));
     TORCH_CHECK(num_groups * group_size <= max_blocks * num_sms,
                 "grid ", num_groups * group_size, " blocks cannot be co-resident (", max_blocks, " blocks/SM x ", num_sms, " SMs)");
 
