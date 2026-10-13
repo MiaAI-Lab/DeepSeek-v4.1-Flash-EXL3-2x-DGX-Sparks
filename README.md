@@ -392,6 +392,25 @@ onto each node's local NVMe (47.2 GiB per layer per rank at TP=2, so ~94 GiB per
 node; packing took 8.5 min). Decode and prefill then miss to local O_DIRECT
 instead of NFS — worth 25–50 % of prefill. Not required to boot.
 
+## Cold-load time
+
+`overlay/patch_load_speedups.py` and the one-interpreter patch loop in `start.sh` shorten a cold boot without changing
+what is served (same weights, same replies). Measured on two GB10 Sparks, each change on its own with smoke, decode
+and a quality battery as gates:
+
+| Change | Before | After |
+|---|---:|---:|
+| DSpark draft opens only the shards that hold `mtp.*` (2 of 39) | 17-30 s | 3.6-3.9 s |
+| `safetensors_weights_iterator`: one header parse + `torch.frombuffer` per tensor | main load 147.5 s | 138.8 s |
+| Container patches in one interpreter (most import vllm only to find its path) | 22 s | 4 s |
+| Bytecode cached under the mounted vLLM cache (`sys.pycache_prefix`) | launch to model 28 s | 25-26 s |
+
+The safetensors reader keeps safetensors' key order and its MAP_PRIVATE mapping, and falls back to safetensors for
+any dtype it does not know; on one boot it produced the same 12,850 tensors (name, dtype, shape, md5) in the same
+order as the stock iterator. Decode was checked on alternating cold boots with and without it (C1 31.4 vs 32.4,
+C2 48.8 vs 48.5 tok/s). Its share grows when the rest of the weight path is fast: with a loader that streams the
+staged bytes from local NVMe instead of the mmap'd shards, the same reader took the main load from 52-60 s to 31-33 s. Each part logs `applied` / `already applied` / `SKIPPED` and never stops a boot.
+
 ## Agent prefix caching
 
 Both ranks default to `PREFIX_CACHE_RETENTION_INTERVAL=4096`, passed explicitly
